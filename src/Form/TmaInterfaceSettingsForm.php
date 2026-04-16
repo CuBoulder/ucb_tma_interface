@@ -59,6 +59,12 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
             "#default_value" => $config->get("authentication_user")
         ];
 
+        $form["authentication_client_name"] = [
+            "#type" => "textfield",
+            "#title" => $this->t("Authentication Client Name"),
+            "#default_value" => $config->get("authentication_client_name")
+        ];
+
         $form["authentication_pass"] = [
             "#type" => "password",
             "#title" => $this->t("Authentication Password"),
@@ -74,13 +80,12 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
     public function submitForm(array &$form, FormStateInterface $form_state) {
         $config = $this->config("ucb_tma_interface.settings");
 
-        \Drupal::logger('Config set')->notice($form_state->getValue("authentication_pass"));
-
         $this->configFactory->getEditable("ucb_tma_interface.settings")
             ->set("request_url", $form_state->getValue("request_url") ? $form_state->getValue("request_url") : $config->get("request_url"))
             ->set("locations_url", $form_state->getValue("locations_url") ? $form_state->getValue("locations_url") : $config->get("locations_url"))
             ->set("authentication_url", $form_state->getValue("authentication_url") ? $form_state->getValue("authentication_url") : $config->get("authentication_url"))
             ->set("authentication_user", $form_state->getValue("authentication_user") ? $form_state->getValue("authentication_user") : $config->get("authentication_user"))
+            ->set("authentication_client_name", $form_state->getValue("authentication_client_name") ? $form_state->getValue("authentication_client_name") : $config->get("authentication_client_name"))
             ->set("authentication_pass", $form_state->getValue("authentication_pass") ? $form_state->getValue("authentication_pass") : $config->get("authentication_pass"))
             ->save();
 

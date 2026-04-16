@@ -2,21 +2,10 @@ name: 'UCB TMA Interface'
 type: module
 description: Handles all interactions and requests to and from the TMA Systems webTMA API.
 package: custom
-core_version_requirement: ^8.8 || ^9 || ^10 || ^11
+core_version_requirement: ^11
 dependencies:
   - 'webform:webform'
   - 'feeds:feeds'
   - 'taxonomy:taxonomy'
   - 'node:node'
   - 'views:views'
-name: 'UCB TMA Interface'
-type: module
-description: 'TMA Platform API (v7) integration — auth, locations, work order submission.'
-package: Custom
-core_version_requirement: ^10 || ^11
-dependencies:
-  - drupal:taxonomy
-  - drupal:node
-  - drupal:views
-  - drupal:webform
-  - feeds:feeds

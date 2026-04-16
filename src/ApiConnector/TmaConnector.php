@@ -105,7 +105,7 @@ class TmaConnector {
             'body' => json_encode([
                 'username' => $this->config->get('authentication_user'),
                 'password' => $this->config->get('authentication_pass'),
-                'client' => 'ucb',
+                'client' => $this->config->get('authentication_client_name'),
                 'language' => '0'
             ])
         ];
