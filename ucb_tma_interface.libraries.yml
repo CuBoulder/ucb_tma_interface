@@ -1,0 +1,13 @@
+location_data:
+  version: 1.x
+  js:
+    js/location_data.js
+  dependencies:
+    - core/jquery
+
+report:
+  version: 1.x
+  js:
+    js/report.js: {}
+  dependencies:
+    - core/jquery

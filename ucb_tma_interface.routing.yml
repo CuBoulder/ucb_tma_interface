@@ -1,0 +1,42 @@
+ucb_tma_interface.get_all_requests:
+  path: /tma/request
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\TmaFrontController::getFixitRequest
+  requirements:
+    _permission: administrator
+
+ucb_tma_interface.get_facilities:
+  path: /tma/location/facility
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\TmaFrontController::getFacility
+  requirements:
+    _permission: access content
+
+ucb_tma_interface.get_buildings:
+  path: /tma/location/building
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\TmaFrontController::getBuilding
+  requirements:
+    _permission: access content
+
+ucb_tma_interface.get_areas:
+  path: /tma/location/area
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\TmaFrontController::getArea
+  requirements:
+    _permission: access content
+
+ucb_tma_interface.get_areas_by_facility:
+  path: /tma/location/area/{facility}
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\TmaFrontController::getArea
+  requirements:
+    _permission: access content
+
+ucb_tma_interface.settings:
+  path: /admin/config/tma
+  defaults:
+    _form: \Drupal\ucb_tma_interface\Form\TmaInterfaceSettingsForm
+    _title: TMA Interface Configuration
+  requirements:
+    _permission: administer site configuration

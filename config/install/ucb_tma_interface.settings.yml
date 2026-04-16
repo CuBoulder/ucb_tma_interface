@@ -1,0 +1,5 @@
+request_url: "https://tma.colorado.edu/webtma/Webservice/Mobile.svc/AdministrationBusinessObjects/iRequest"
+locations_url: "https://tma.colorado.edu/webtma/Webservice/Mobile.svc/OrganizationBusinessObjects/"
+authentication_url: "https://tma.colorado.edu/tmalogin/webservice/mobilelogin.svc/AuthenticateUser"
+authentication_user: "FIXIT"
+authentication_pass: "REMOVED_SECRET"

@@ -1,0 +1,6 @@
+services:
+  ucb_tma_interface.drush_commands:
+    class: Drupal\ucb_tma_interface\Drush\Commands\TmaSeedCommands
+    tags:
+      - { name: drush.command }
+

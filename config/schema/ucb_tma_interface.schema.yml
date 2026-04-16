@@ -1,0 +1,20 @@
+# @see Configuration schema/metadata at https://drupal.org/node/1905070
+#
+field.field_building.value:
+  type: sequence
+  label: "Default value"
+  sequence:
+    - type: mapping
+      label: "Default"
+      mapping:
+        value:
+          type: string
+          label: "Value"
+
+ucb_tma_interface.config:
+  type: config_object
+  label: "TMA Interface Config"
+  mapping:
+    message:
+      type: text
+      label: "Message"

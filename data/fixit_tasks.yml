@@ -1,0 +1,458 @@
+- title: Trash/Recycling/Compost
+  parent_tile: Cleanliness
+  task_code: ENVRON
+  exception: false
+  exception_text: null
+  repair_center: false
+  parent_vid:
+- title: Cleanliness Issue
+  parent_tile: Cleanliness
+  task_code: ENVRON
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Dining General
+  parent_tile: Dining Services
+  task_code: DNGGEN
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Trash/Recycling
+  parent_tile: Grounds
+  task_code: null
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Snow/Ice
+  parent_tile: Grounds
+  task_code: null
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Desk Lamp
+  parent_tile: Light & Power
+  task_code: LAMP
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Outdoor Lighting
+  parent_tile: Light & Power
+  task_code: POLLHT
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Dispenser Restock
+  parent_tile: Restroom Supplies & Dispensers
+  task_code: DSPSTK
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Locked Out of Your Room
+  parent_tile: Access
+  task_code: null
+  exception: true
+  exception_text: "If you are locked out of your room, please call the Housing Facilities Service Desk at 303-735-5555"
+  repair_center: false
+- title: Issues with Change Machines or Vending Machines
+  parent_tile: Laundry
+  task_code: null
+  exception: true
+  exception_text: "To report issues with change machines or vending machines, please call Campus Vending at 303-492-7028"
+  repair_center: false
+- title: Issues with Elevators or Lifts
+  parent_tile: Elevator
+  task_code: null
+  exception: true
+  exception_text: "To report issues with elevators or lifts, please call the Housing Facilities Service Desk at 303-735-5555"
+  repair_center: false
+- title: Issues with Unwanted Bugs or Animals
+  parent_tile: Pest Control
+  task_code: null
+  exception: false
+  exception_text: "To report issues with insects, animals, or other pests, please call the Housing Facilities Service Desk at (303) 735-5555"
+  repair_center: false
+- title: Lock Not Working/Beeping
+  parent_tile: Access
+  task_code: IS-03
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Security Camera Issues
+  parent_tile: Access
+  task_code: IS-04D
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Issues with Internet, Personal Computers or Cable TV
+  parent_tile: Internet - A/V - Computers
+  task_code: null
+  exception: true
+  exception_text: "For Issues with Internet, Personal Computers or Cable TV, please call Office of Information Technology (OIT) at 303-735-4357."
+  repair_center: false
+- title: Issues with Community Washers and Dryers
+  parent_tile: Laundry
+  task_code: null
+  exception: true
+  exception_text: "To report issues with community washers and dryers, please follow instructions on the signage in the laundry room or call CSC Serviceworks at 1-800-622-4729"
+  repair_center: false
+- title: New Lock Install
+  parent_tile: Access
+  task_code: IS-03A
+  exception: false
+  exception_text: null
+  repair_center: false
+  parent_vid: "services"
+- title: New or Replacement Key
+  parent_tile: Access
+  task_code: IS-02C
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Extra Cleaning
+  parent_tile: Extra Cleaning
+  task_code: ENVRON
+  exception: false
+  exception_text: null
+  repair_center: false
+  parent_vid: "services"
+- title: Move or Deliver Something
+  parent_tile: Move - Deliver
+  task_code: MVE-DLV
+  exception: false
+  exception_text: null
+  repair_center: false
+  parent_vid: "services"
+- title: Paint a Room or Office
+  parent_tile: Paint
+  task_code: PAINTG
+  exception: false
+  exception_text: null
+  repair_center: false
+  parent_vid: "services"
+- title: Salto/Ccure Workstation Issues
+  parent_tile: Internet - A/V - Computers
+  task_code: IS-07
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: New or Replacement Key
+  parent_tile: Access
+  task_code: IS-02C
+  exception: false
+  exception_text: null
+  repair_center: false
+  parent_vid: "services"
+- title: Tree Issue
+  parent_tile: Grounds
+  task_code: null
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Dining Equipment
+  parent_tile: Dining Services
+  task_code: DNGEQP
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Bed Repair
+  parent_tile: Furniture
+  task_code: BEDRPR
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Bulletin/White Board
+  parent_tile: Walls, Floors & Ceilings
+  task_code: BOARDS
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Cabinet
+  parent_tile: Furniture
+  task_code: CABINT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Ceiling
+  parent_tile: Walls, Floors & Ceilings
+  task_code: WLL-CNG
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Chair - Sofa
+  parent_tile: Furniture
+  task_code: CHR-SFA
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Desk - Table
+  parent_tile: Furniture
+  task_code: DSK-TBL
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Desk Chair
+  parent_tile: Furniture
+  task_code: CHR-SFA
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Dishwasher
+  parent_tile: Residential Appliances
+  task_code: RES-DSH
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Dispenser Repair
+  parent_tile: Restroom Supplies & Dispensers
+  task_code: DSPRPR
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Door
+  parent_tile: Doors & Windows
+  task_code: DOOR
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Dresser - Vanity
+  parent_tile: Furniture
+  task_code: DRS-VAN
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Exit Sign - Emergency Light
+  parent_tile: Fire Safety
+  task_code: EXT-LHT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Exit Sign - Emergency Light
+  parent_tile: Light & Power
+  task_code: EXT-LHT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Fan/Vent
+  parent_tile: Heating & Cooling
+  task_code: FAN-VNT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Fire Extinguisher
+  parent_tile: Fire Safety
+  task_code: FIREXT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Fire Sprinkler
+  parent_tile: Fire Safety
+  task_code: FIRSPK
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Floor Drain
+  parent_tile: Plumbing
+  task_code: FLRDRN
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Garbage Disposal
+  parent_tile: Residential Appliances
+  task_code: RES-DSP
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Leaking Unit
+  parent_tile: Heating & Cooling
+  task_code: UNTLEK
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Light
+  parent_tile: Light & Power
+  task_code: LIGHTS
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Microfridge - Microwave
+  parent_tile: Residential Appliances
+  task_code: RES-MFR
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: No Hot Water
+  parent_tile: Plumbing
+  task_code: NOHWTR
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: No Power
+  parent_tile: Light & Power
+  task_code: NOPOWR
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Noisy Unit
+  parent_tile: Heating & Cooling
+  task_code: NSYUNT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Outlet - Switch
+  parent_tile: Light & Power
+  task_code: OLT-SWH
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Refrigerator - Freezer
+  parent_tile: Residential Appliances
+  task_code: RES-REF
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Shower - Tub
+  parent_tile: Plumbing
+  task_code: SHR-TUB
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Signage
+  parent_tile: Walls, Floors & Ceilings
+  task_code: SIGNAG
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Sink
+  parent_tile: Plumbing
+  task_code: SINK
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Smoke/Carbon Monoxide Detector
+  parent_tile: Fire Safety
+  task_code: DETECT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Stove - Oven
+  parent_tile: Residential Appliances
+  task_code: RES-STV
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Thermostat
+  parent_tile: Heating & Cooling
+  task_code: THERMT
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Toilet
+  parent_tile: Plumbing
+  task_code: TOILET
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Too Cold
+  parent_tile: Heating & Cooling
+  task_code: TOOCLD
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Vacuum Cleaner
+  parent_tile: Residential Appliances
+  task_code: RES-VAC
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Walls
+  parent_tile: Walls, Floors & Ceilings
+  task_code: WLL-CNG
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Washer/Dryer (In-Unit)
+  parent_tile: Residential Appliances
+  task_code: RES-WAD
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Water Fountain - Bottle Fill
+  parent_tile: Plumbing
+  task_code: WTRFBF
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Water Leak
+  parent_tile: Plumbing
+  task_code: WTRLEK
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Window
+  parent_tile: Doors & Windows
+  task_code: WINDOW
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Window Blinds
+  parent_tile: Doors & Windows
+  task_code: BLINDS
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Floor & Carpet Repair
+  parent_tile: Walls, Floors & Ceilings
+  task_code: FLORNG
+  exception: false
+  exception_text: null
+  repair_center: true
+- title: Floor & Carpet Cleaning
+  parent_tile: Walls, Floors & Ceilings
+  task_code: ENVRON
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Issues with Staff Computers, Audio Visual (A/V) Equipment or Printers Owned by the University of Colorado
+  parent_tile: Internet - A/V - Computers
+  task_code: null
+  exception: true
+  exception_text: "To report issues with Staff Computers, Audio Visual (A/V) Equipment or Printers Owned by the University of Colorado, please call Student Affairs Information Technology (SAIT) at 303-735-4357."
+  repair_center: false
+- title: Issues with Card Readers
+  parent_tile: Laundry
+  task_code: null
+  exception: true
+  exception_text: "To report issues with card readers, please contact Student Affairs Information Technology (SAIT) email saithelpdesk@colorado.edu"
+  repair_center: false
+- title: Custodial Equipment Repair
+  parent_tile: Cleanliness
+  task_code: CUSTEQ
+  exception: false
+  exception_text: null
+  repair_center: false
+- title: Request Project
+  parent_tile: Install - Hang - Build
+  task_code: PROJ-REQ
+  exception: false
+  exception_text: null
+  repair_center: true
+  parent_vid: "services"
+- title: Request Signage
+  parent_tile: Install - Hang - Build
+  task_code: SIGNAG
+  exception: false
+  exception_text: null
+  repair_center: true
+  parent_vid: "services"
+- title: Move or Remove an Existing Loft
+  parent_tile: Furniture
+  task_code: null
+  exception: true
+  exception_text: "We are not offering lofted beds for the 2025-2026 academic year. To have your existing loft moved or removed, please email your request to universityhousing@colorado.edu."
+  repair_center: false
+- title: Too Hot
+  parent_tile: Heating & Cooling
+  task_code: TOOHOT
+  exception: false
+  exception_text: null
+  repair_center: true

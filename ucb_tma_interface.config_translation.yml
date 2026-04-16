@@ -1,0 +1,5 @@
+ucb_tma_interface.config:
+  title: "TMA Interface Translatable Config"
+  base_route_name: ucb_tma_interface.admin.config
+  names:
+    - ucb_tma_interface.config

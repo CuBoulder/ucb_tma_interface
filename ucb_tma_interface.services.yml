@@ -1,0 +1,4 @@
+services:
+  ucb_tma_interface.fixit_seeder:
+    class: Drupal\ucb_tma_interface\Service\FixitSeeder
+    arguments: ['@entity_type.manager', '@module_handler']
