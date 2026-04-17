@@ -46,7 +46,7 @@
               $.each(data, function(key, entry) {
                 dropdown.append(
                   $("<option></option>")
-                    .attr("value", htmlDecode(entry.name))
+                    .attr("value", entry.field_tma_building_id_)
                     .text(htmlDecode(entry.name))
                 );
               });
@@ -72,28 +72,30 @@
         $("#edit-area").addClass("loading");
         $(".loading").after('<p id="loader-icon">&nbsp;</p>');
 
-        // get building ID
-        var url = "/rest/building/" + this.value;
+        // Building dropdown stores numeric building id as value.
+        // Avoid putting building names in the URL (names can contain '/' which breaks routing).
+        var buildingId = this.value;
+        if (!buildingId) {
+          $("#loader-icon").hide();
+          return;
+        }
+
+        var url = "/rest/areas/" + buildingId;
+        // Populate dropdown with list of areas in building
         $.getJSON(url, function(data) {
           $.each(data, function(key, entry) {
-            url = "/rest/areas/" + entry.field_tma_building_id_;
-            // Populate dropdown with list of areas in building
-            $.getJSON(url, function(data) {
-              $.each(data, function(key, entry) {
-                dropdown.append(
-                  $("<option></option>")
-                    .attr("value", htmlDecode(entry.name))
-                    .text(
-                      htmlDecode(
-                        entry.name + ", " + entry.field_tma_description
-                      )
-                    )
-                );
-              });
-              // Hide Loading icon
-              $("#loader-icon").hide();
-            });
+            dropdown.append(
+              $("<option></option>")
+                .attr("value", htmlDecode(entry.name))
+                .text(
+                  htmlDecode(
+                    entry.name + ", " + entry.field_tma_description
+                  )
+                )
+            );
           });
+          // Hide Loading icon
+          $("#loader-icon").hide();
         });
       });
 
