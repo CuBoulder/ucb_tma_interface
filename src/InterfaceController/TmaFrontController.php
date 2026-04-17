@@ -97,47 +97,19 @@ class TmaFrontController {
     }
 
     private function getLocationData($type, $facilityName = null): array {
-        $locations = [];
-        $raw_data = json_decode($this->connector->getResponse($this->config->get('locations_url') . ($type == "Area" ? "simpleArea" : $type), self::TMA_KEYS[strtolower($type) . "_active"], 1)->getBody(), true)[self::TMA_KEYS["data"]][self::TMA_KEYS[strtolower($type)]];
-
-        if(strtolower($type) == "area") {
-            if($facilityName) {
-                foreach ($raw_data as $loc) {
-                    if ($loc[self::TMA_KEYS["area_active"]] == "True" && $loc[self::TMA_KEYS["facility_name"]] == $facilityName) { // && !$loc[self::TMA_KEYS["area_exclude"]]) {
-                        $locations[] = [
-                            "pk" => $loc[self::TMA_KEYS["pk"]],
-                            "name" => $loc[self::TMA_KEYS[strtolower($type) . "_name"]],
-                            "connector" => $loc[self::TMA_KEYS[strtolower($type) . "_connector"]],
-                            "description" => $loc[self::TMA_KEYS[strtolower($type) . "_description"]],
-                            "floor_code" => $loc[self::TMA_KEYS["floor_code"]]
-                        ];
-                    }
-                }
-            } else {
-                foreach ($raw_data as $loc) {
-                    if ($loc[self::TMA_KEYS["area_active"]] == "True") { // && !$loc[self::TMA_KEYS["area_exclude"]]) {
-                        $locations[] = [
-                            "pk" => $loc[self::TMA_KEYS["pk"]],
-                            "name" => $loc[self::TMA_KEYS[strtolower($type) . "_name"]],
-                            "connector" => $loc[self::TMA_KEYS[strtolower($type) . "_connector"]],
-                            "description" => $loc[self::TMA_KEYS[strtolower($type) . "_description"]],
-                            "floor_code" => $loc[self::TMA_KEYS["floor_code"]]
-                        ];
-                    }
-                }
-            }
-        } else if(strtolower($type) != "area"){
-            foreach ($raw_data as $loc) {
-                if ($loc[self::TMA_KEYS[strtolower($type) . "_active"]] == "True") {
-                    $locations[] = [
-                        "pk" => $loc[self::TMA_KEYS["pk"]],
-                        "name" => $loc[self::TMA_KEYS[strtolower($type) . "_name"]],
-                        "connector" => $loc[self::TMA_KEYS[strtolower($type) . "_connector"]]
-                    ];
-                }
-            }
+        /** @var \Drupal\ucb_tma_interface\Service\TmaLocationFeedPayloadBuilder $builder */
+        $builder = \Drupal::service('ucb_tma_interface.location_feed_payload');
+        $t = strtolower((string) $type);
+        if ($t === 'facility') {
+          return $builder->getFeedItems('Facility', NULL);
         }
-        return $locations;
+        if ($t === 'building') {
+          return $builder->getFeedItems('Building', NULL);
+        }
+        if ($t === 'area') {
+          return $builder->getFeedItems('Area', $facilityName);
+        }
+        return [];
     }
 
 }

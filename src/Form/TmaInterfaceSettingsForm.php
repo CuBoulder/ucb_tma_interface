@@ -35,6 +35,20 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
     public function buildForm(array $form, FormStateInterface $form_state) {
         $config = $this->config("ucb_tma_interface.settings");
 
+        $form["base_url"] = [
+            "#type" => "textfield",
+            "#title" => $this->t("Platform API Base Url"),
+            "#description" => $this->t("Example: https://devtma7.colorado.edu/webTMA7/platformapi (no trailing slash)"),
+            "#default_value" => $config->get("base_url")
+        ];
+
+        $form["feeds_base_url"] = [
+            "#type" => "textfield",
+            "#title" => $this->t("Feeds source site URL (optional)"),
+            "#description" => $this->t("Base URL Feeds uses when importing from /tma/location/*. Required for Drush Feeds imports when the site is not reached via a real HTTP request (e.g. DDEV: https://yourproject.ddev.site). No trailing slash. Leave empty to auto-detect (DDEV_PRIMARY_URL, request context, or fixit.colorado.edu fallback)."),
+            "#default_value" => $config->get("feeds_base_url") ?? '',
+        ];
+
         $form["request_url"] = [
             "#type" => "textfield",
             "#title" => $this->t("Request Url"),
@@ -81,6 +95,8 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
         $config = $this->config("ucb_tma_interface.settings");
 
         $this->configFactory->getEditable("ucb_tma_interface.settings")
+            ->set("base_url", $form_state->getValue("base_url") ? $form_state->getValue("base_url") : $config->get("base_url"))
+            ->set("feeds_base_url", trim((string) ($form_state->getValue("feeds_base_url") ?? '')))
             ->set("request_url", $form_state->getValue("request_url") ? $form_state->getValue("request_url") : $config->get("request_url"))
             ->set("locations_url", $form_state->getValue("locations_url") ? $form_state->getValue("locations_url") : $config->get("locations_url"))
             ->set("authentication_url", $form_state->getValue("authentication_url") ? $form_state->getValue("authentication_url") : $config->get("authentication_url"))

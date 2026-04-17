@@ -1,4 +1,12 @@
 services:
   ucb_tma_interface.fixit_seeder:
     class: Drupal\ucb_tma_interface\Service\FixitSeeder
-    arguments: ['@entity_type.manager', '@module_handler']
+    arguments: ['@entity_type.manager', '@module_handler', '@ucb_tma_interface.location_feed_payload']
+
+  ucb_tma_interface.location_feed_payload:
+    class: Drupal\ucb_tma_interface\Service\TmaLocationFeedPayloadBuilder
+    arguments: ['@ucb_tma_interface.platform_connector']
+
+  ucb_tma_interface.platform_connector:
+    class: Drupal\ucb_tma_interface\ApiConnector\PlatformConnector
+    arguments: ['@http_client', '@cache.default']

@@ -12,43 +12,77 @@ final class FixitSeeder {
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly TmaLocationFeedPayloadBuilder $locationFeedPayload,
   ) {}
 
   /**
+   * Base URL Feeds should use for HTTP GET to this site’s /tma/location/* JSON routes.
+   *
+   * In web requests this is usually correct from the request context. In Drush/CLI there
+   * is often no host; set config feeds_base_url or rely on DDEV_PRIMARY_URL.
+   */
+  public function resolveFeedsBaseUrl(): string {
+    $config = \Drupal::config('ucb_tma_interface.settings');
+    $explicit = trim((string) ($config->get('feeds_base_url') ?? ''));
+    if ($explicit !== '') {
+      return rtrim($explicit, '/');
+    }
+
+    $ddev = getenv('DDEV_PRIMARY_URL');
+    if (is_string($ddev) && $ddev !== '') {
+      return rtrim($ddev, '/');
+    }
+
+    try {
+      $base = \Drupal::service('router.request_context')->getCompleteBaseUrl();
+      if (is_string($base) && $base !== '' && !preg_match('#://default($|/)#', $base)) {
+        return rtrim($base, '/');
+      }
+    }
+    catch (\Throwable) {
+    }
+
+    if (!empty($GLOBALS['base_url']) && is_string($GLOBALS['base_url'])) {
+      return rtrim($GLOBALS['base_url'], '/');
+    }
+
+    // Legacy default (production); wrong for local dev if nothing else is set.
+    return 'https://fixit.colorado.edu';
+  }
+
+  /**
    * Ensure the standard Fixit Feeds feed instances exist.
+   *
+   * Also updates the `source` URL on existing feeds when the resolved base URL changes
+   * (e.g. after setting feeds_base_url or switching DDEV projects).
    */
   public function ensureFeedsExist(): int {
     if (!$this->moduleHandler->moduleExists('feeds')) {
       throw new \RuntimeException('feeds module is not enabled.');
     }
 
+    $base = $this->resolveFeedsBaseUrl();
+    $logger = \Drupal::logger('ucb_tma_interface');
+    $logger->notice('Feeds: using site base URL @base for /tma/location sources.', ['@base' => $base]);
+
     $feeds = [
       [
         'type' => 'tma_facility_import',
         'title' => 'TMA Facility',
-        'source' => 'https://fixit.colorado.edu/tma/location/facility',
+        'source' => $base . '/tma/location/facility',
       ],
       [
         'type' => 'tma_building_import',
         'title' => 'TMA Building',
-        'source' => 'https://fixit.colorado.edu/tma/location/building',
+        'source' => $base . '/tma/location/building',
       ],
     ];
 
-    $campuses = [
-      'Central Campus',
-      'Williams Village',
-      'Graduate and Family Housing',
-      'Grounds',
-      'East Campus',
-      'Kittredge Loop',
-      'Bear Creek',
-    ];
-    foreach ($campuses as $campus) {
+    foreach (TmaLocationFeedPayloadBuilder::FEEDS_AREA_CAMPUS_NAMES as $campus) {
       $feeds[] = [
         'type' => 'tma_area_import',
         'title' => 'TMA Areas - ' . $campus,
-        'source' => 'https://fixit.colorado.edu/tma/location/area/' . rawurlencode($campus),
+        'source' => $base . '/tma/location/area/' . rawurlencode($campus),
       ];
     }
 
@@ -56,8 +90,22 @@ final class FixitSeeder {
     $created = 0;
 
     foreach ($feeds as $f) {
-      $existing = $storage->loadByProperties(['type' => $f['type'], 'source' => $f['source']]);
+      $existing = $storage->loadByProperties([
+        'type' => $f['type'],
+        'title' => $f['title'],
+      ]);
       if ($existing) {
+        /** @var \Drupal\feeds\Entity\Feed $entity */
+        $entity = reset($existing);
+        $current = (string) $entity->getSource();
+        if ($current !== $f['source']) {
+          $entity->setSource($f['source']);
+          $entity->save();
+          $logger->notice('Feeds: updated source for @title → @url', [
+            '@title' => $f['title'],
+            '@url' => $f['source'],
+          ]);
+        }
         continue;
       }
       $e = $storage->create([
@@ -84,6 +132,11 @@ final class FixitSeeder {
       throw new \RuntimeException('feeds module is not enabled.');
     }
 
+    if (\function_exists('set_time_limit')) {
+      @set_time_limit(0);
+    }
+
+    $logger = \Drupal::logger('ucb_tma_interface');
     $storage = $this->entityTypeManager->getStorage('feeds_feed');
     $feeds = $storage->loadMultiple();
 
@@ -91,17 +144,230 @@ final class FixitSeeder {
     $failed = 0;
 
     foreach ($feeds as $feed) {
-      // Import is defined on Feeds feed entity.
       try {
+        $logger->notice('Feeds: starting import for @title.', [
+          '@title' => $feed->label(),
+        ]);
+        // Feeds then logs its own result (e.g. "Created N … items") to the log.
         $feed->import();
         $imported++;
       }
-      catch (\Throwable) {
+      catch (\Throwable $e) {
         $failed++;
+        $logger->error('Feeds: import failed for @title: @msg', [
+          '@title' => $feed->label(),
+          '@msg' => $e->getMessage(),
+        ]);
       }
     }
 
     return ['imported' => $imported, 'failed' => $failed];
+  }
+
+  /**
+   * Import facility, building, and area taxonomy directly from the Platform API (v7).
+   *
+   * Used by default from Drush because Feeds fetches /tma/location/* via HTTP, which
+   * often returns empty JSON in CLI/cron contexts; this path uses the same service as
+   * the admin UI (JWT + columns=… on list endpoints).
+   *
+   * @return array<string, int>
+   */
+  public function importLocationTaxonomyFromPlatform(): array {
+    if (\function_exists('set_time_limit')) {
+      @set_time_limit(0);
+    }
+
+    $logger = \Drupal::logger('ucb_tma_interface');
+    $out = [
+      'facility_created' => 0,
+      'facility_updated' => 0,
+      'building_created' => 0,
+      'building_updated' => 0,
+      'area_created' => 0,
+      'area_updated' => 0,
+      'skipped_rows' => 0,
+      'http_errors' => 0,
+    ];
+
+    $logger->notice('TMA seed: direct import uses the same legacy JSON as /tma/location/* (shared builder).');
+
+    $termStorage = $this->entityTypeManager->getStorage('taxonomy_term');
+    $b = $this->locationFeedPayload;
+
+    $facilityItems = $b->getFeedItems('Facility', NULL);
+    if ($facilityItems === []) {
+      $out['http_errors']++;
+      $logger->error('Platform location import: no facility rows (check base_url and credentials).');
+      return $out;
+    }
+
+    $facilityMap = $this->buildTmaTermIdMap('facility', 'field_tma_facility_id');
+    foreach ($facilityItems as $item) {
+      if (!is_array($item) || !isset($item['pk']) || !is_numeric($item['pk'])) {
+        $out['skipped_rows']++;
+        continue;
+      }
+      $tmaId = (int) $item['pk'];
+      $label = $this->truncateTermName(trim((string) ($item['name'] ?? '')) !== '' ? trim((string) $item['name']) : ('Facility ' . $tmaId));
+      if (isset($facilityMap[$tmaId])) {
+        /** @var \Drupal\taxonomy\TermInterface $term */
+        $term = $termStorage->load($facilityMap[$tmaId]);
+        if ($term) {
+          $term->setName($label);
+          $term->set('field_tma_facility_id', $tmaId);
+          $term->save();
+          $out['facility_updated']++;
+        }
+      }
+      else {
+        $term = Term::create([
+          'vid' => 'facility',
+          'name' => $label,
+          'status' => 1,
+          'field_tma_facility_id' => $tmaId,
+        ]);
+        $term->save();
+        $facilityMap[$tmaId] = (int) $term->id();
+        $out['facility_created']++;
+      }
+    }
+
+    $buildingItems = $b->getFeedItems('Building', NULL);
+    if ($buildingItems === []) {
+      $out['http_errors']++;
+      $logger->error('Platform location import: no building rows.');
+      return $out;
+    }
+
+    $buildingMap = $this->buildTmaTermIdMap('building', 'field_tma_building_id_');
+    foreach ($buildingItems as $item) {
+      if (!is_array($item) || !isset($item['pk'], $item['connector']) || !is_numeric($item['pk']) || !is_numeric($item['connector'])) {
+        $out['skipped_rows']++;
+        continue;
+      }
+      $tmaId = (int) $item['pk'];
+      $facilityId = (int) $item['connector'];
+      $label = $this->truncateTermName(trim((string) ($item['name'] ?? '')) !== '' ? trim((string) $item['name']) : ('Building ' . $tmaId));
+      if (isset($buildingMap[$tmaId])) {
+        /** @var \Drupal\taxonomy\TermInterface $term */
+        $term = $termStorage->load($buildingMap[$tmaId]);
+        if ($term) {
+          $term->setName($label);
+          $term->set('field_tma_facility_id', $facilityId);
+          $term->set('field_tma_building_id_', $tmaId);
+          $term->save();
+          $out['building_updated']++;
+        }
+      }
+      else {
+        $term = Term::create([
+          'vid' => 'building',
+          'name' => $label,
+          'status' => 1,
+          'field_tma_facility_id' => $facilityId,
+          'field_tma_building_id_' => $tmaId,
+        ]);
+        $term->save();
+        $buildingMap[$tmaId] = (int) $term->id();
+        $out['building_created']++;
+      }
+    }
+
+    // Same area set as the union of the seven campus Feeds (FacilityName must match FEEDS_AREA_CAMPUS_NAMES).
+    $areaItems = $b->getFeedItems('Area', NULL);
+    if ($areaItems === []) {
+      $logger->warning('Platform location import: no area rows after campus filter (check API + FacilityName).');
+    }
+
+    $areaMap = $this->buildTmaTermIdMap('area', 'field_tma_area_id');
+    foreach ($areaItems as $item) {
+      if (!is_array($item) || !isset($item['pk'], $item['connector']) || !is_numeric($item['pk']) || !is_numeric($item['connector'])) {
+        $out['skipped_rows']++;
+        continue;
+      }
+      $tmaId = (int) $item['pk'];
+      $buildingId = (int) $item['connector'];
+      $label = $this->truncateTermName(trim((string) ($item['name'] ?? '')) !== '' ? trim((string) $item['name']) : ('Area ' . $tmaId));
+      $floor = $this->truncateString((string) ($item['floor_code'] ?? ''), 255);
+      $descRaw = trim((string) ($item['description'] ?? ''));
+      $description = $descRaw !== '' ? $this->truncateString($descRaw, 255) : '';
+
+      if (isset($areaMap[$tmaId])) {
+        /** @var \Drupal\taxonomy\TermInterface $term */
+        $term = $termStorage->load($areaMap[$tmaId]);
+        if ($term) {
+          $term->setName($label);
+          $term->set('field_tma_building_id_', $buildingId);
+          $term->set('field_tma_area_id', $tmaId);
+          $term->set('field_floor', $floor);
+          $term->set('field_tma_description', $description);
+          $term->save();
+          $out['area_updated']++;
+        }
+      }
+      else {
+        $term = Term::create([
+          'vid' => 'area',
+          'name' => $label,
+          'status' => 1,
+          'field_tma_building_id_' => $buildingId,
+          'field_tma_area_id' => $tmaId,
+          'field_floor' => $floor,
+          'field_tma_description' => $description,
+        ]);
+        $term->save();
+        $areaMap[$tmaId] = (int) $term->id();
+        $out['area_created']++;
+      }
+    }
+
+    $logger->notice(
+      'Platform location taxonomy import finished: facilities +@fc ~@fu, buildings +@bc ~@bu, areas +@ac ~@au, skipped=@sk',
+      [
+        '@fc' => $out['facility_created'],
+        '@fu' => $out['facility_updated'],
+        '@bc' => $out['building_created'],
+        '@bu' => $out['building_updated'],
+        '@ac' => $out['area_created'],
+        '@au' => $out['area_updated'],
+        '@sk' => $out['skipped_rows'],
+      ]
+    );
+
+    return $out;
+  }
+
+  /**
+   * @return array<int, int>
+   */
+  private function buildTmaTermIdMap(string $vid, string $fieldName): array {
+    $storage = $this->entityTypeManager->getStorage('taxonomy_term');
+    $tids = $storage->getQuery()
+      ->accessCheck(FALSE)
+      ->condition('vid', $vid)
+      ->execute();
+    $map = [];
+    foreach (array_chunk(array_values($tids), 400) as $chunk) {
+      foreach ($storage->loadMultiple($chunk) as $term) {
+        if (!$term->hasField($fieldName) || $term->get($fieldName)->isEmpty()) {
+          continue;
+        }
+        $map[(int) $term->get($fieldName)->value] = (int) $term->id();
+      }
+    }
+    return $map;
+  }
+
+  private function truncateString(string $s, int $max): string {
+    if (strlen($s) <= $max) {
+      return $s;
+    }
+    return substr($s, 0, $max);
+  }
+
+  private function truncateTermName(string $name): string {
+    return $this->truncateString($name, 255);
   }
 
   /**
