@@ -8,9 +8,11 @@
 
 namespace Drupal\ucb_tma_interface\InterfaceController;
 
+use Drupal\ucb_tma_interface\ApiConnector\PlatformConnector;
 use Drupal\ucb_tma_interface\ApiConnector\TmaConnector;
 use Drupal\ucb_tma_interface\FixitRequest\FixitRequestHandler;
-use function GuzzleHttp\Psr7\str;
+use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 /**
@@ -64,8 +66,38 @@ class TmaFrontController {
      * @return array|\Psr\Http\Message\ResponseInterface
      */
     public function submitFixitRequest($request) {
+        // Prefer Platform API v7 (Bearer JWT) when configured; fall back to legacy Mobile/iRequest.
+        $platformBase = rtrim((string) $this->config->get('base_url'), '/');
+        if ($platformBase !== '') {
+            $platform = \Drupal::service('ucb_tma_interface.platform_connector');
+            if ($platform instanceof PlatformConnector) {
+                $reqData = is_array($request) ? $request : [];
+                // WorkRequest (code-based) matches legacy Fix It behavior; direct WorkOrders POST
+                // often fails for area locations with server-side FK / nullable binding errors.
+                $payload = $this->buildPlatformWorkRequestPayload($reqData, $platform);
+                if ($payload === NULL) {
+                    return $this->buildPlatformSubmissionErrorResponse('Could not resolve TMA facility or building codes for WorkRequest.');
+                }
+                $this->debugLog('v7.before', [
+                    'incoming' => $this->sanitizeForLog($reqData),
+                    'payload' => $this->sanitizeForLog($payload),
+                ]);
+                $resp = $platform->postJson('/v2/WorkRequest', $payload);
+                $this->debugLog('v7.after', $this->formatResponseForLog($resp));
+                return $resp;
+            }
+        }
+
         $fixitHandler = new FixitRequestHandler($request);
-        return $this->connector->sendRequest($this->config->get('request_url'), $fixitHandler->formatRequest());
+        $legacyBody = $fixitHandler->formatRequest();
+        $this->debugLog('v5.before', [
+            'incoming' => $this->sanitizeForLog(is_array($request) ? $request : []),
+            // v5 payload is JSON string; decode if possible for nicer logging.
+            'payload' => $this->sanitizeForLog(json_decode($legacyBody, TRUE) ?: ['raw' => $this->truncate((string) $legacyBody)]),
+        ]);
+        $resp = $this->connector->sendRequest($this->config->get('request_url'), $legacyBody);
+        $this->debugLog('v5.after', $this->formatResponseForLog($resp));
+        return $resp;
     }
 
     /**
@@ -110,6 +142,419 @@ class TmaFrontController {
           return $builder->getFeedItems('Area', $facilityName);
         }
         return [];
+    }
+
+    /**
+     * Build a v7 Platform API WorkRequest payload (code-based; matches Fix It / RequestTypes).
+     *
+     * @param array<string, mixed> $request
+     *
+     * @return array<string, mixed>|null Null when facility/building codes cannot be resolved.
+     */
+    private function buildPlatformWorkRequestPayload(array $request, PlatformConnector $platform): ?array {
+        $contact = is_array($request['user_contact'] ?? NULL) ? $request['user_contact'] : [];
+        $requestorName = trim((string) ($contact['name'] ?? ''));
+        $requestorEmail = trim((string) ($contact['email'] ?? ''));
+        $requestorPhone = trim((string) ($contact['phone'] ?? ''));
+        $actionRequested = trim((string) ($request['input_information_related_to_the_issue'] ?? ''));
+
+        $taskCode = trim((string) ($request['task_select'] ?? ''));
+        $repairCenterField = trim((string) ($request['repair_center'] ?? ''));
+
+        $facilityName = trim((string) ($request['facility'] ?? ''));
+        $buildingRaw = trim((string) ($request['building'] ?? ''));
+        $areaName = trim((string) ($request['area'] ?? ''));
+
+        $facilityTmaId = $facilityName !== '' ? $this->lookupTermTmaIdByName('facility', 'field_tma_facility_id', $facilityName) : NULL;
+
+        $buildingId = is_numeric($buildingRaw) ? (int) $buildingRaw : NULL;
+        if (!is_int($buildingId) && $buildingRaw !== '') {
+            $buildingId = $this->lookupTermTmaIdByName('building', 'field_tma_building_id_', $buildingRaw);
+        }
+
+        $areaId = $areaName !== '' ? $this->lookupTermTmaIdByName('area', 'field_tma_area_id', $areaName) : NULL;
+
+        $facilityCode = is_int($facilityTmaId) ? $this->fetchFacilityCode($platform, $facilityTmaId) : NULL;
+        $buildingCode = is_int($buildingId) ? $this->fetchBuildingCode($platform, $buildingId) : NULL;
+
+        $roomNumber = NULL;
+        if (is_int($areaId)) {
+            $roomNumber = $this->fetchAreaRoomNumber($platform, $areaId);
+            if ($roomNumber === NULL || $roomNumber === '') {
+                $roomNumber = $areaName;
+            }
+        }
+
+        $repairCenterCode = $repairCenterField !== '' ? $repairCenterField : NULL;
+        if ($repairCenterCode === NULL) {
+            $task = $taskCode !== '' ? $this->lookupTaskByCode($platform, $taskCode) : NULL;
+            $repairCenterId = is_array($task) ? $this->extractTaskRepairCenterId($task) : NULL;
+            if (!is_int($repairCenterId) && is_int($areaId)) {
+                $repairCenterId = $this->lookupAreaRepairCenterId($platform, $areaId);
+            }
+            if (is_int($repairCenterId)) {
+                $repairCenterCode = $this->fetchRepairCenterCode($platform, $repairCenterId);
+            }
+        }
+
+        $requestTypeCode = trim((string) ($this->config->get('platform_request_type_code') ?: 'WEB'));
+        if ($requestTypeCode === '') {
+            $requestTypeCode = 'WEB';
+        }
+
+        $this->debugLog('v7.resolved_ids', [
+            'taskCode' => $taskCode,
+            'requestTypeCode' => $requestTypeCode,
+            'repairCenterField' => $repairCenterField,
+            'repairCenterCode' => $repairCenterCode,
+            'facilityName' => $facilityName,
+            'facilityTmaId' => $facilityTmaId,
+            'facilityCode' => $facilityCode,
+            'buildingRaw' => $buildingRaw,
+            'buildingId' => $buildingId,
+            'buildingCode' => $buildingCode,
+            'areaName' => $areaName,
+            'areaId' => $areaId,
+            'roomNumber' => $roomNumber,
+        ]);
+
+        if ($facilityCode === NULL || $facilityCode === '' || $buildingCode === NULL || $buildingCode === '') {
+            return NULL;
+        }
+
+        $payload = [
+            'externalID' => uniqid('fixit_', TRUE),
+            'requestTypeCode' => $requestTypeCode,
+            'facilityCode' => $facilityCode,
+            'buildingCode' => $buildingCode,
+            'requestDate' => gmdate('c'),
+            'actionRequested' => $actionRequested,
+            'requestorEmail' => $requestorEmail,
+            'requestorName' => $requestorName,
+            'requestorPhoneNumber' => $requestorPhone,
+        ];
+        if ($taskCode !== '') {
+            $payload['taskCode'] = $taskCode;
+        }
+        if ($repairCenterCode !== NULL && $repairCenterCode !== '') {
+            $payload['repairCenterCode'] = $repairCenterCode;
+        }
+        if ($roomNumber !== NULL && $roomNumber !== '') {
+            $payload['roomNumber'] = $roomNumber;
+        }
+        $floor = trim((string) ($request['floor'] ?? ''));
+        if ($floor !== '') {
+            $payload['floorNumber'] = $floor;
+        }
+        $extra = [];
+        if ($requestorName !== '') {
+            $extra[] = 'Requestor: ' . $requestorName;
+        }
+        if ($requestorPhone !== '') {
+            $extra[] = 'Phone: ' . $requestorPhone;
+        }
+        if ($extra !== []) {
+            $payload['comments'] = implode(' | ', $extra);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchPlatformEntity(PlatformConnector $platform, string $relativePath): ?array {
+        $resp = $platform->get($relativePath);
+        if (!$resp instanceof ResponseInterface || $resp->getStatusCode() !== 200) {
+            return NULL;
+        }
+        $data = json_decode((string) $resp->getBody(), TRUE);
+        return is_array($data) ? $data : NULL;
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function stringFieldFromRecord(?array $record, array $keys): ?string {
+        if (!is_array($record)) {
+            return NULL;
+        }
+        foreach ($keys as $key) {
+            $v = $record[$key] ?? NULL;
+            if (is_string($v) && trim($v) !== '') {
+                return trim($v);
+            }
+        }
+        return NULL;
+    }
+
+    private function fetchFacilityCode(PlatformConnector $platform, int $facilityId): ?string {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/Facilities/' . $facilityId . '?columns=Code');
+        return $this->stringFieldFromRecord($rec, ['Code', 'code']);
+    }
+
+    private function fetchBuildingCode(PlatformConnector $platform, int $buildingId): ?string {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/Buildings/' . $buildingId . '?columns=Code');
+        return $this->stringFieldFromRecord($rec, ['Code', 'code']);
+    }
+
+    private function fetchRepairCenterCode(PlatformConnector $platform, int $repairCenterId): ?string {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/RepairCenters/' . $repairCenterId . '?columns=Code');
+        return $this->stringFieldFromRecord($rec, ['Code', 'code']);
+    }
+
+    private function fetchAreaRoomNumber(PlatformConnector $platform, int $areaId): ?string {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $areaId . '?columns=RoomNumber,LocationCode');
+        $room = $this->stringFieldFromRecord($rec, ['RoomNumber', 'roomNumber']);
+        if (is_string($room) && $room !== '') {
+            return $room;
+        }
+        return $this->stringFieldFromRecord($rec, ['LocationCode', 'locationCode']);
+    }
+
+    private function buildPlatformSubmissionErrorResponse(string $message): ResponseInterface {
+        $body = json_encode([
+            'Success' => FALSE,
+            'ErrorMessage' => $message,
+            'TMAWorkOrderNumber' => NULL,
+            'TMARequestNumber' => NULL,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return new Response(400, ['Content-Type' => 'application/json'], $body ?: '{}');
+    }
+
+    /**
+     * Resolve a taxonomy term's TMA id by term name.
+     */
+    private function lookupTermTmaIdByName(string $vocab, string $fieldMachineName, string $termName): ?int {
+        try {
+            $storage = \Drupal::entityTypeManager()->getStorage('taxonomy_term');
+            $tids = $storage->getQuery()
+                ->accessCheck(FALSE)
+                ->condition('vid', $vocab)
+                ->condition('name', $termName)
+                ->range(0, 1)
+                ->execute();
+            if (!$tids) {
+                return NULL;
+            }
+            $term = $storage->load((int) reset($tids));
+            if (!$term || !$term->hasField($fieldMachineName)) {
+                return NULL;
+            }
+            $val = $term->get($fieldMachineName)->value ?? NULL;
+            $id = is_numeric($val) ? (int) $val : NULL;
+            return ($id && $id > 0) ? $id : NULL;
+        }
+        catch (\Throwable) {
+            return NULL;
+        }
+    }
+
+    /**
+     * Lookup Task by Code using Platform API.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function lookupTaskByCode(PlatformConnector $platform, string $taskCode): ?array {
+        // Platform list endpoints may return either a bare list or {Data: [...], TotalCount: N}.
+        $filter = rawurlencode("Code eq '" . str_replace("'", "''", $taskCode) . "'");
+        // RepairCenterLinks is not a valid list column in some TMA instances; PreferredRepairCenterId is.
+        $resp = $platform->get('/v2/Tasks?filter=' . $filter . '&pageSize=1&columns=Id,Code,PreferredRepairCenterId');
+        $rows = $this->decodePlatformListRows($resp);
+        if (isset($rows[0]) && is_array($rows[0])) {
+            return $rows[0];
+        }
+
+        // Case-insensitive fallback.
+        $filter2 = rawurlencode("tolower(Code) eq '" . str_replace("'", "''", strtolower($taskCode)) . "'");
+        $resp2 = $platform->get('/v2/Tasks?filter=' . $filter2 . '&pageSize=1&columns=Id,Code,PreferredRepairCenterId');
+        $rows2 = $this->decodePlatformListRows($resp2);
+        if (isset($rows2[0]) && is_array($rows2[0])) {
+            return $rows2[0];
+        }
+        return NULL;
+    }
+
+    private function extractTaskRepairCenterId(array $task): ?int {
+        $pref = $task['PreferredRepairCenterId'] ?? $task['preferredRepairCenterId'] ?? NULL;
+        if (is_numeric($pref)) {
+            return (int) $pref;
+        }
+        $links = $task['repairCenterLinks'] ?? $task['RepairCenterLinks'] ?? NULL;
+        if (!is_array($links) || $links === []) {
+            return NULL;
+        }
+        // Prefer preferred link when present, else first.
+        $preferred = NULL;
+        foreach ($links as $link) {
+            if (is_array($link) && (($link['preferred'] ?? FALSE) === TRUE || ($link['Preferred'] ?? FALSE) === TRUE)) {
+                $preferred = $link;
+                break;
+            }
+        }
+        $link = $preferred ?? (is_array($links[0] ?? NULL) ? $links[0] : NULL);
+        if (!is_array($link)) {
+            return NULL;
+        }
+        $id = $link['repairCenterId'] ?? $link['RepairCenterId'] ?? NULL;
+        return is_numeric($id) ? (int) $id : NULL;
+    }
+
+    private function lookupAreaRepairCenterId(PlatformConnector $platform, int $areaId): ?int {
+        $resp = $platform->get('/v2/Areas/' . $areaId . '?columns=Id,RepairCenterLinks,RepairCenterId');
+        if (!method_exists($resp, 'getBody')) {
+            return NULL;
+        }
+        $data = json_decode((string) $resp->getBody(), TRUE);
+        if (!is_array($data)) {
+            return NULL;
+        }
+        $rc = $data['RepairCenterId'] ?? $data['repairCenterId'] ?? NULL;
+        if (is_numeric($rc)) {
+            return (int) $rc;
+        }
+        $links = $data['RepairCenterLinks'] ?? $data['repairCenterLinks'] ?? NULL;
+        if (!is_array($links) || $links === []) {
+            return NULL;
+        }
+        $first = is_array($links[0] ?? NULL) ? $links[0] : NULL;
+        if (!is_array($first)) {
+            return NULL;
+        }
+        $id = $first['RepairCenterId'] ?? $first['repairCenterId'] ?? NULL;
+        return is_numeric($id) ? (int) $id : NULL;
+    }
+
+    private function lookupRepairCenterIdByCode(PlatformConnector $platform, string $code): ?int {
+        $filter = rawurlencode("Code eq '" . str_replace("'", "''", $code) . "'");
+        $resp = $platform->get('/v2/RepairCenters?filter=' . $filter . '&pageSize=1&columns=Id,Code');
+        $rows = $this->decodePlatformListRows($resp);
+        $first = is_array($rows[0] ?? NULL) ? $rows[0] : NULL;
+        if (!is_array($first)) {
+            return NULL;
+        }
+        $id = $first['Id'] ?? $first['id'] ?? NULL;
+        return is_numeric($id) ? (int) $id : NULL;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function decodePlatformListRows(mixed $resp): array {
+        if (!$resp instanceof ResponseInterface || $resp->getStatusCode() !== 200) {
+            // If debugging is on, log non-200 bodies to help diagnose filters.
+            if ($resp instanceof ResponseInterface) {
+                $this->debugLog('v7.platform_list_error', [
+                    'status' => $resp->getStatusCode(),
+                    'body' => $this->sanitizeForLog($this->truncate($this->readResponseBodyWithoutConsuming($resp), 2000)),
+                ]);
+            }
+            return [];
+        }
+        $raw = $this->readResponseBodyWithoutConsuming($resp);
+        $decoded = json_decode($raw, TRUE);
+        if (!is_array($decoded)) {
+            return [];
+        }
+        if (array_is_list($decoded)) {
+            return $decoded;
+        }
+        $data = $decoded['Data'] ?? $decoded['data'] ?? [];
+        return is_array($data) ? $data : [];
+    }
+
+    private function debugEnabled(): bool {
+        return (bool) $this->config->get('debug_api_logging');
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function debugLog(string $event, array $context): void {
+        if (!$this->debugEnabled()) {
+            return;
+        }
+        try {
+            \Drupal::logger('ucb_tma_interface')->notice('TMA submit debug: @event @json', [
+                '@event' => $event,
+                '@json' => json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ]);
+        }
+        catch (\Throwable) {
+            // Never fail submission due to logging.
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatResponseForLog(mixed $resp): array {
+        if ($resp instanceof ResponseInterface) {
+            $body = $this->readResponseBodyWithoutConsuming($resp);
+            return [
+                'type' => 'http',
+                'status' => $resp->getStatusCode(),
+                'body' => $this->sanitizeForLog(json_decode($body, TRUE) ?: ['raw' => $this->truncate($body)]),
+            ];
+        }
+        if (is_array($resp)) {
+            return [
+                'type' => 'drupal_markup_array',
+                'body' => $this->sanitizeForLog($resp),
+            ];
+        }
+        return [
+            'type' => gettype($resp),
+            'body' => $this->truncate((string) $resp),
+        ];
+    }
+
+    private function readResponseBodyWithoutConsuming(ResponseInterface $resp): string {
+        try {
+            $stream = $resp->getBody();
+            $contents = (string) $stream;
+            if (method_exists($stream, 'isSeekable') && $stream->isSeekable()) {
+                $stream->rewind();
+            }
+            return $contents;
+        }
+        catch (\Throwable) {
+            return '';
+        }
+    }
+
+    /**
+     * Redact secrets and shrink nested payloads for logs.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function sanitizeForLog(mixed $value): mixed {
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $key = is_string($k) ? $k : (string) $k;
+                $lower = strtolower($key);
+                if (str_contains($lower, 'password') || str_contains($lower, 'authorization') || str_contains($lower, 'token')) {
+                    $out[$key] = '[REDACTED]';
+                    continue;
+                }
+                $out[$key] = $this->sanitizeForLog($v);
+            }
+            return $out;
+        }
+        if (is_string($value)) {
+            return $this->truncate($value);
+        }
+        return $value;
+    }
+
+    private function truncate(string $s, int $max = 5000): string {
+        $s = (string) $s;
+        if (strlen($s) <= $max) {
+            return $s;
+        }
+        return substr($s, 0, $max) . '…[truncated]';
     }
 
 }

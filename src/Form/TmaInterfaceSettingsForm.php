@@ -85,6 +85,13 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
             "#default_value" => $config->get("authentication_pass")
         ];
 
+        $form["debug_api_logging"] = [
+            "#type" => "checkbox",
+            "#title" => $this->t("Enable verbose TMA API debug logging"),
+            "#description" => $this->t("Logs request/response payloads for v7 WorkOrder submission to Drupal logs. Warning: may include requestor PII and request details."),
+            "#default_value" => (bool) $config->get("debug_api_logging"),
+        ];
+
         return parent::buildForm($form, $form_state);
     }
 
@@ -103,6 +110,7 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
             ->set("authentication_user", $form_state->getValue("authentication_user") ? $form_state->getValue("authentication_user") : $config->get("authentication_user"))
             ->set("authentication_client_name", $form_state->getValue("authentication_client_name") ? $form_state->getValue("authentication_client_name") : $config->get("authentication_client_name"))
             ->set("authentication_pass", $form_state->getValue("authentication_pass") ? $form_state->getValue("authentication_pass") : $config->get("authentication_pass"))
+            ->set("debug_api_logging", (bool) $form_state->getValue("debug_api_logging"))
             ->save();
 
         parent::submitForm($form, $form_state);

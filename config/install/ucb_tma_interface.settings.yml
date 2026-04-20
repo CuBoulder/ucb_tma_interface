@@ -10,3 +10,10 @@ base_url: "https://devtma7.colorado.edu/webTMA7/platformapi"
 # Optional. Base URL Feeds uses for /tma/location/* (Drush/CLI has no real hostname without this).
 # Example (DDEV): https://mysite.ddev.site
 feeds_base_url: ""
+
+# When enabled, logs request/response payloads for debugging.
+# WARNING: may include requestor PII (name/email/phone) and request text.
+debug_api_logging: false
+
+# Platform WorkRequest: RequestTypes.Code for Fix It (see /v2/RequestTypes).
+platform_request_type_code: "WEB"

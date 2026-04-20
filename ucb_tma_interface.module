@@ -17,22 +17,44 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
 		if ($element['#webform_id'] === 'report_a_problem--building' || $element['#webform_id'] === 'request_services--building') {
 			if (isset($element['#default_value']) && strlen($element['#default_value'])) {
 				$building_name = $element['#default_value'];
-				// select facility id from building taxonomy
+				// Prefer the Platform-backed location routes, not legacy /rest/* endpoints.
+				// Select facility id from building taxonomy.
 				$query = \Drupal::database()->select('taxonomy_term_field_data', 'fn');
 				$query->addField('fi', 'field_tma_facility_id_value');
 				$query->join('taxonomy_term__field_tma_facility_id', 'fi', 'fn.tid = fi.entity_id');
 				$query->condition('fn.name', $building_name);
 				$facility_id = $query->execute()->fetchField();
-				global $base_url;
-				$uri = $base_url . '/rest/buildings/' . $facility_id;
-				$response = \Drupal::httpClient()->get($uri);
-				$data = (string) $response->getBody();
-				$decoded = Json::decode($data);
-				$new_options=array();
-				foreach($decoded as $building) {
-					$new_options[$building['name']] = $building['name'];
+				$facility_id = is_numeric($facility_id) ? (int) $facility_id : 0;
+				if ($facility_id > 0) {
+					try {
+						$builder = \Drupal::service('ucb_tma_interface.location_feed_payload');
+						$buildings = is_object($builder) && method_exists($builder, 'getFeedItems') ? $builder->getFeedItems('Building', NULL) : [];
+						$new_options = [];
+						if (is_array($buildings)) {
+							foreach ($buildings as $b) {
+								if (!is_array($b)) {
+									continue;
+								}
+								// connector is facility id.
+								if ((int) ($b['connector'] ?? 0) !== $facility_id) {
+									continue;
+								}
+								$name = $b['name'] ?? NULL;
+								if (is_string($name) && $name !== '') {
+									$new_options[$name] = $name;
+								}
+							}
+						}
+						if (!empty($new_options)) {
+							$element['#options'] = $new_options;
+						}
+					}
+					catch (\Throwable $e) {
+						if (\Drupal::config('ucb_tma_interface.settings')->get('debug_api_logging')) {
+							\Drupal::logger('ucb_tma_interface')->notice('Dropdown buildings build exception: @msg', ['@msg' => $e->getMessage()]);
+						}
+					}
 				}
-				$element['#options'] = $new_options;
 			}
 			$element['#validated'] = TRUE;
         } else if ($element['#webform_id'] === 'report_a_problem--area' || $element['#webform_id'] === 'request_services--area') {
@@ -44,22 +66,39 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
 				$query->join('taxonomy_term__field_tma_building_id_', 'bi', 'bn.tid = bi.entity_id');
 				$query->condition('bn.name', $area_name);
 				$building_id = $query->execute()->fetchField();
-				global $base_url;
-				$uri = $base_url . '/rest/areas/' . $building_id;
-				$response = \Drupal::httpClient()->get($uri);
-				$data = (string) $response->getBody();
-				$decoded = Json::decode($data);
-				$new_options=array();
-				foreach($decoded as $areas) {
-					$name = is_array($areas) ? ($areas['name'] ?? NULL) : NULL;
-					if (!is_string($name) || $name === '') {
-						continue;
+				$building_id = is_numeric($building_id) ? (int) $building_id : 0;
+				if ($building_id > 0) {
+					try {
+						$builder = \Drupal::service('ucb_tma_interface.location_feed_payload');
+						$areas = is_object($builder) && method_exists($builder, 'getFeedItems') ? $builder->getFeedItems('Area', NULL) : [];
+						$new_options=array();
+						if (is_array($areas)) {
+							foreach($areas as $a) {
+								if (!is_array($a)) {
+									continue;
+								}
+								// connector is building id.
+								if ((int) ($a['connector'] ?? 0) !== $building_id) {
+									continue;
+								}
+								$name = $a['name'] ?? NULL;
+								if (!is_string($name) || $name === '') {
+									continue;
+								}
+								$desc = trim((string) ($a['description'] ?? ''));
+								$new_options[$name] = $desc !== '' ? ($name . ', ' . $desc) : $name;
+							}
+						}
+						if (!empty($new_options)) {
+							$element['#options'] = $new_options;
+						}
 					}
-					$desc = is_array($areas) ? (string) ($areas['description'] ?? '') : '';
-					$desc = trim($desc);
-					$new_options[$name] = $desc !== '' ? ($name . ', ' . $desc) : $name;
+					catch (\Throwable $e) {
+						if (\Drupal::config('ucb_tma_interface.settings')->get('debug_api_logging')) {
+							\Drupal::logger('ucb_tma_interface')->notice('Dropdown areas build exception: @msg', ['@msg' => $e->getMessage()]);
+						}
+					}
 				}
-				$element['#options'] = $new_options;
 			}
 			$element['#validated'] = TRUE;
 //        } elseif ($element['#webform_id'] === 'report_a_problem--facility') {

@@ -11,10 +11,16 @@ field.field_building.value:
           type: string
           label: "Value"
 
-ucb_tma_interface.config:
+ucb_tma_interface.settings:
   type: config_object
   label: "TMA Interface Config"
   mapping:
     message:
       type: text
       label: "Message"
+    debug_api_logging:
+      type: boolean
+      label: "Enable verbose TMA API debug logging"
+    platform_request_type_code:
+      type: string
+      label: "Platform API WorkRequest request type code (e.g. WEB for Fix It)"
