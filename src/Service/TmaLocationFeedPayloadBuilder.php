@@ -271,12 +271,22 @@ final class TmaLocationFeedPayloadBuilder {
     $id = $loc['Id'] ?? $loc['id'] ?? NULL;
     $name = $locationCode !== '' ? $locationCode : ($room !== '' ? $room : (string) $id);
 
+    $floorCode = (string) ($loc['FloorCode'] ?? $loc['floorCode'] ?? '');
+    // Some tenants encode FloorCode with an accidental double-prefix like "ADEN-ADEN-1B".
+    // Normalize this so Drupal taxonomy `field_floor` matches legacy submissions (e.g. "ADEN-1B").
+    $floorCode = trim($floorCode);
+    if ($floorCode !== '') {
+      if (preg_match('/^([A-Za-z0-9]+)-\\1-(.+)$/', $floorCode, $m)) {
+        $floorCode = $m[1] . '-' . $m[2];
+      }
+    }
+
     return [
       'pk' => $id,
       'name' => $name,
       'connector' => $loc['BuildingId'] ?? $loc['buildingId'] ?? NULL,
       'description' => $desc,
-      'floor_code' => $loc['FloorCode'] ?? $loc['floorCode'] ?? '',
+      'floor_code' => $floorCode,
     ];
   }
 
