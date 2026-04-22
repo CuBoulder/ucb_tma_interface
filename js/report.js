@@ -36,20 +36,41 @@
             .text("- None -")
         );
         $("select[name=area]").prop("selectedIndex", 0);
-        // get facility ID
-        var url = "/rest/facility/" + this.value;
-        $.getJSON(url, function(data) {
-          $.each(data, function(key, entry) {
-            url = "/rest/buildings/" + entry.field_tma_facility_id;
-            // Populate dropdown with list of buildings in facility
-            $.getJSON(url, function(data) {
-              $.each(data, function(key, entry) {
-                dropdown.append(
-                  $("<option></option>")
-                    .attr("value", entry.field_tma_building_id_)
-                    .text(htmlDecode(entry.name))
-                );
-              });
+        // Facility dropdown stores the facility name as value (legacy webform design).
+        // Fetch all buildings and filter client-side by facility connector (facility id).
+        var selectedFacilityName = this.value;
+        if (!selectedFacilityName) {
+          return;
+        }
+
+        var facilityNameUrl = "/tma/location/facility";
+        $.getJSON(facilityNameUrl, function(facilities) {
+          var facilityId = null;
+          $.each(facilities, function(_, f) {
+            if (f && f.name === selectedFacilityName) {
+              facilityId = f.pk;
+              return false;
+            }
+          });
+          if (!facilityId) {
+            return;
+          }
+
+          var buildingsUrl = "/tma/location/building";
+          $.getJSON(buildingsUrl, function(buildings) {
+            $.each(buildings, function(_, b) {
+              if (!b) {
+                return;
+              }
+              // builder maps connector => facilityId
+              if (String(b.connector) !== String(facilityId)) {
+                return;
+              }
+              dropdown.append(
+                $("<option></option>")
+                  .attr("value", b.pk)
+                  .text(htmlDecode(b.name))
+              );
             });
           });
         });
@@ -80,18 +101,25 @@
           return;
         }
 
-        var url = "/rest/areas/" + buildingId;
-        // Populate dropdown with list of areas in building
+        // Areas endpoint is keyed by facility name, so we fetch all areas and filter by building connector.
+        var url = "/tma/location/area";
         $.getJSON(url, function(data) {
-          $.each(data, function(key, entry) {
+          $.each(data, function(_, entry) {
+            if (!entry) {
+              return;
+            }
+            // builder maps connector => buildingId
+            if (String(entry.connector) !== String(buildingId)) {
+              return;
+            }
+            var label = entry.name;
+            if (entry.description) {
+              label = entry.name + ", " + entry.description;
+            }
             dropdown.append(
               $("<option></option>")
                 .attr("value", htmlDecode(entry.name))
-                .text(
-                  htmlDecode(
-                    entry.name + ", " + entry.field_tma_description
-                  )
-                )
+                .text(htmlDecode(label))
             );
           });
           // Hide Loading icon
