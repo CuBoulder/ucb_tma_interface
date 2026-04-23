@@ -83,6 +83,7 @@ class TmaFrontController {
                     'payload' => $this->sanitizeForLog($payload),
                 ]);
                 $resp = $platform->postJson('/v2/WorkRequest', $payload);
+                $resp = $this->maybeWrapWorkRequestResponseAsLegacyIlog($platform, $reqData, $payload, $resp);
                 $this->debugLog('v7.after', $this->formatResponseForLog($resp));
                 return $resp;
             }
@@ -98,6 +99,113 @@ class TmaFrontController {
         $resp = $this->connector->sendRequest($this->config->get('request_url'), $legacyBody);
         $this->debugLog('v5.after', $this->formatResponseForLog($resp));
         return $resp;
+    }
+
+    /**
+     * When Platform WorkRequest succeeds, return a legacy-shaped iRequest response body.
+     *
+     * This keeps downstream behavior (ticket_id, confirmation pages, existing parsing)
+     * as close to the v5 Mobile/iRequest integration as possible.
+     */
+    private function maybeWrapWorkRequestResponseAsLegacyIlog(PlatformConnector $platform, array $reqData, array $payload, mixed $resp): mixed {
+        if (!$resp instanceof ResponseInterface) {
+            return $resp;
+        }
+
+        $status = $resp->getStatusCode();
+        if ($status < 200 || $status >= 300) {
+            return $resp;
+        }
+
+        $raw = $this->readResponseBodyWithoutConsuming($resp);
+        $decoded = json_decode($raw, TRUE);
+        if (!is_array($decoded)) {
+            return $resp;
+        }
+
+        $success = $decoded['Success'] ?? $decoded['success'] ?? NULL;
+        if ($success !== TRUE) {
+            return $resp;
+        }
+
+        $woNumber = (string) ($decoded['TMAWorkOrderNumber'] ?? $decoded['tmaWorkOrderNumber'] ?? '');
+        $requestNumber = (string) ($decoded['TMARequestNumber'] ?? $decoded['tmaRequestNumber'] ?? '');
+
+        $contact = is_array($reqData['user_contact'] ?? NULL) ? $reqData['user_contact'] : [];
+        $requestorName = (string) ($contact['name'] ?? '');
+        $requestorEmail = (string) ($contact['email'] ?? '');
+        $requestorPhone = (string) ($contact['phone'] ?? '');
+        $actionRequested = (string) ($reqData['input_information_related_to_the_issue'] ?? '');
+
+        $facilityLabel = (string) ($reqData['facility'] ?? '');
+        $areaLabel = (string) ($reqData['area'] ?? '');
+        // Prefer the computed floor we actually submitted to Platform.
+        $floor = (string) ($payload['floorNumber'] ?? ($reqData['floor'] ?? ''));
+        if (trim($floor) === '' && $areaLabel !== '') {
+            $floor = $this->lookupLegacyFloorByAreaName($areaLabel) ?? '';
+        }
+
+        $buildingName = '';
+        $buildingRaw = (string) ($reqData['building'] ?? '');
+        if ($buildingRaw !== '' && is_numeric($buildingRaw)) {
+            $b = $this->fetchPlatformEntity($platform, '/v2/Buildings/' . (int) $buildingRaw . '?columns=Name');
+            if (is_array($b)) {
+                $buildingName = (string) ($b['Name'] ?? $b['name'] ?? '');
+            }
+        }
+        if ($buildingName === '') {
+            $buildingName = $buildingRaw;
+        }
+
+        $clientName = (string) ($this->config->get('authentication_client_name') ?? '');
+        if ($clientName === '') {
+            $clientName = 'ucb';
+        }
+
+        $repairCenterCode = (string) ($payload['repairCenterCode'] ?? '');
+        $taskCode = (string) ($payload['taskCode'] ?? '');
+        $requestType = 'Fix It!';
+
+        $now = gmdate('c');
+        $reqDate = (string) ($payload['requestDate'] ?? $now);
+
+        $legacy = [
+            'NewDataSet' => [
+                'i_WebTMA_Requests' => [
+                    [
+                        'ILOG_PK' => '',
+                        // Prefer work order number when present; fall back to request number.
+                        'ILOG_NUMBER' => (string) (($woNumber !== '') ? $woNumber : $requestNumber),
+                        'ILOG_REQUESTOR' => (string) $requestorName,
+                        'ILOG_REQ_DATE' => (string) $reqDate,
+                        'ILOG_REQ_PHONE' => (string) $requestorPhone,
+                        'ILOG_REQ_EMAIL' => (string) $requestorEmail,
+                        'ILOG_REQUEST' => (string) $actionRequested,
+                        'ILOG_CREATED_DATE' => (string) $reqDate,
+                        'ILOG_CLIENT_NAME' => (string) $clientName,
+                        'ILOG_EMAIL' => TRUE,
+                        'ILOG_RQ_ID' => '',
+                        'ILOG_PROCESSED' => 0,
+                        'ILOG_PROCESSED_ERROR' => '',
+                        'ILOG_RC_CODE' => (string) $repairCenterCode,
+                        'ILOG_REQ_TYPE' => (string) $requestType,
+                        'ILOG_FACILITY' => (string) $facilityLabel,
+                        'ILOG_BUILDING' => (string) $buildingName,
+                        'ILOG_FLOOR' => (string) $floor,
+                        'ILOG_AREA' => (string) $areaLabel,
+                        'ILOG_REF' => '',
+                        'ILOG_STATUS' => '',
+                        'ILOG_department' => '',
+                        'ILOG_TASKCODE' => (string) $taskCode,
+                        'ILOG_ACCOUNTCODE' => '',
+                        'state' => 0,
+                    ],
+                ],
+            ],
+        ];
+
+        $body = json_encode($legacy, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        return new Response(200, ['Content-Type' => 'application/json'], $body ?: '{}');
     }
 
     /**
@@ -178,9 +286,22 @@ class TmaFrontController {
         $buildingCode = is_int($buildingId) ? $this->fetchBuildingCode($platform, $buildingId) : NULL;
 
         $roomNumber = NULL;
+        $areaFloorCode = NULL;
+        $areaSubLocation = NULL;
         if (is_int($areaId)) {
-            $roomNumber = $this->fetchAreaRoomNumber($platform, $areaId);
+            // For WorkRequest, "roomNumber" is the best available stand-in for legacy ILOG_AREA.
+            // Prefer the Area's LocationCode (e.g. BRCKA-1101) over plain RoomNumber (e.g. 1101),
+            // because this is what requestors/search commonly use in TMA.
+            $areaRec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $areaId . '?columns=RoomNumber,LocationCode,FloorCode,Description');
+            if (is_array($areaRec)) {
+                $loc = $this->stringFieldFromRecord($areaRec, ['LocationCode', 'locationCode']);
+                $rm = $this->stringFieldFromRecord($areaRec, ['RoomNumber', 'roomNumber']);
+                $roomNumber = ($loc !== NULL && $loc !== '') ? $loc : $rm;
+                $areaFloorCode = $this->stringFieldFromRecord($areaRec, ['FloorCode', 'floorCode']);
+                $areaSubLocation = $this->stringFieldFromRecord($areaRec, ['Description', 'description']);
+            }
             if ($roomNumber === NULL || $roomNumber === '') {
+                // Fallback to whatever label came from the webform.
                 $roomNumber = $areaName;
             }
         }
@@ -242,9 +363,22 @@ class TmaFrontController {
         if ($roomNumber !== NULL && $roomNumber !== '') {
             $payload['roomNumber'] = $roomNumber;
         }
+        // Prefer legacy-derived floor (Drupal taxonomy) for parity with v5 submissions.
+        // Platform Areas often have FloorCode/FloorId null (e.g. housing), so relying on Platform alone loses floor.
         $floor = trim((string) ($request['floor'] ?? ''));
+        if ($floor === '' && $areaName !== '') {
+            $floor = $this->lookupLegacyFloorByAreaName($areaName) ?? '';
+        }
+        $floorNumber = NULL;
         if ($floor !== '') {
-            $payload['floorNumber'] = $floor;
+            $floorNumber = $floor;
+        }
+        if ($floorNumber !== NULL && $floorNumber !== '') {
+            $payload['floorNumber'] = $floorNumber;
+        }
+        // Best-effort: carry area description as subLocation (helps match legacy "area" semantics in v7).
+        if (is_string($areaSubLocation) && trim($areaSubLocation) !== '') {
+            $payload['subLocation'] = trim($areaSubLocation);
         }
         $extra = [];
         if ($requestorName !== '') {
@@ -258,6 +392,41 @@ class TmaFrontController {
         }
 
         return $payload;
+    }
+
+    /**
+     * Legacy parity: resolve floor code from the Drupal taxonomy term for the selected area.
+     *
+     * The legacy webform handler stored the floor value on submit by looking up
+     * taxonomy_term__field_floor via the area's term name.
+     */
+    private function lookupLegacyFloorByAreaName(string $areaName): ?string {
+        $areaName = trim($areaName);
+        if ($areaName === '') {
+            return NULL;
+        }
+        try {
+            $query = \Drupal::database()->select('taxonomy_term_field_data', 'd');
+            $query->leftJoin('taxonomy_term__field_floor', 'f', 'd.tid = f.entity_id');
+            $query->addField('f', 'field_floor_value');
+            $query->condition('d.name', $areaName);
+            // Ensure we only match the Area vocabulary (names may be duplicated across vocabs).
+            $query->condition('d.vid', 'area');
+            $query->range(0, 1);
+            $val = $query->execute()->fetchField();
+            $s = is_string($val) ? trim($val) : (is_numeric($val) ? (string) $val : '');
+            $out = $s !== '' ? $s : NULL;
+            if ($this->debugEnabled()) {
+                $this->debugLog('v7.floor_lookup', [
+                    'areaName' => $areaName,
+                    'result' => $out,
+                ]);
+            }
+            return $out;
+        }
+        catch (\Throwable) {
+            return NULL;
+        }
     }
 
     /**
@@ -301,15 +470,6 @@ class TmaFrontController {
     private function fetchRepairCenterCode(PlatformConnector $platform, int $repairCenterId): ?string {
         $rec = $this->fetchPlatformEntity($platform, '/v2/RepairCenters/' . $repairCenterId . '?columns=Code');
         return $this->stringFieldFromRecord($rec, ['Code', 'code']);
-    }
-
-    private function fetchAreaRoomNumber(PlatformConnector $platform, int $areaId): ?string {
-        $rec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $areaId . '?columns=RoomNumber,LocationCode');
-        $room = $this->stringFieldFromRecord($rec, ['RoomNumber', 'roomNumber']);
-        if (is_string($room) && $room !== '') {
-            return $room;
-        }
-        return $this->stringFieldFromRecord($rec, ['LocationCode', 'locationCode']);
     }
 
     private function buildPlatformSubmissionErrorResponse(string $message): ResponseInterface {
