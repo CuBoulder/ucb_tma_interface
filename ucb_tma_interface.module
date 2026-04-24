@@ -104,9 +104,29 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
 //        } elseif ($element['#webform_id'] === 'report_a_problem--facility') {
 //			ksm($element);
         } elseif ($element['#webform_id'] === 'report_a_problem--faq'  || $element['#webform_id'] === 'request_services--faq') {
-            if (is_numeric($element['#markup']) && $element['#markup'] * 1 == $element['#markup']) {
- 
+            // In webform YAML this markup is a token string like:
+            //   [webform_submission:values:categories:entity:tid]
+            // It is NOT guaranteed to be numeric at element-alter time, so we derive the tid from
+            // the current submission when available.
+            $tid = NULL;
+            if (isset($element['#markup']) && is_numeric($element['#markup']) && $element['#markup'] * 1 == $element['#markup']) {
 				$tid = (int) $element['#markup'];
+            }
+            if (!$tid && isset($context['webform_submission']) && $context['webform_submission'] instanceof \Drupal\webform\WebformSubmissionInterface) {
+                $cats = $context['webform_submission']->getElementData('categories');
+                if (is_numeric($cats)) {
+                    $tid = (int) $cats;
+                }
+                elseif (is_array($cats)) {
+                    // Some webforms store taxonomy references as arrays (take first).
+                    $first = reset($cats);
+                    if (is_numeric($first)) {
+                        $tid = (int) $first;
+                    }
+                }
+            }
+
+            if (is_int($tid) && $tid > 0) {
 				$args = [$tid];
 
 				// create Knowledge Base by Task
@@ -151,7 +171,16 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
 }
 
 function ucb_tma_interface_webform_submission_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
-//    ksm($form);
-//	ksm($form_id);
+	// Ensure the FixIt UI behavior JS is attached even if a webform handler is misconfigured.
+	// This is needed for exception popups and location dropdown UX.
+	try {
+		$webform_id = $form['#webform_id'] ?? NULL;
+		if ($webform_id === 'report_a_problem' || $webform_id === 'request_services') {
+			$form['#attached']['library'][] = 'ucb_tma_interface/report';
+		}
+	}
+	catch (\Throwable) {
+		// Ignore.
+	}
 }
 

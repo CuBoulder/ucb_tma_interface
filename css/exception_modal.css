@@ -1,0 +1,50 @@
+.ucb-tma-exception-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 10000;
+  display: none;
+}
+
+.ucb-tma-exception-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(600px, calc(100vw - 32px));
+  max-height: min(400px, calc(100vh - 32px));
+  overflow: auto;
+  background: #fff;
+  color: #000;
+  z-index: 10001;
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  padding: 18px 18px 14px;
+  display: none;
+}
+
+.ucb-tma-exception-modal .exception-content h2 {
+  margin-top: 0;
+}
+
+.ucb-tma-exception-modal .button-wrap {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ucb-tma-exception-modal a.button {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: #0277bd;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ucb-tma-exception-modal a.button[name='return_home'] {
+  background: #6b7280;
+}
+

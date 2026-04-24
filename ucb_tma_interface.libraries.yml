@@ -9,5 +9,8 @@ report:
   version: 1.x
   js:
     js/report.js: {}
+  css:
+    theme:
+      css/exception_modal.css: {}
   dependencies:
     - core/jquery

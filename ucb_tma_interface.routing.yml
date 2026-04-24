@@ -40,3 +40,10 @@ ucb_tma_interface.settings:
     _title: TMA Interface Configuration
   requirements:
     _permission: administer site configuration
+
+ucb_tma_interface.task_exceptions:
+  path: /tma/task-exceptions
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\TmaFrontController::getTaskExceptions
+  requirements:
+    _permission: access content

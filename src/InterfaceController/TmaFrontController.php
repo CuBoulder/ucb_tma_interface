@@ -14,6 +14,7 @@ use Drupal\ucb_tma_interface\FixitRequest\FixitRequestHandler;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Drupal\Component\Serialization\Yaml;
 
 /**
  * Class TmaFrontController
@@ -234,6 +235,46 @@ class TmaFrontController {
      */
     public function getArea($facility = null) {
         return new JsonResponse($this->getLocationData("Area", $facilityName = $facility));
+    }
+
+    /**
+     * Return the exception map (title -> exception_text) from fixit_tasks.yml.
+     *
+     * This avoids relying on content entities/views to determine exceptions, and matches
+     * the canonical dataset used for seeding tasks.
+     */
+    public function getTaskExceptions(): JsonResponse {
+        $path = \Drupal::service('extension.list.module')->getPath('ucb_tma_interface');
+        $yamlPath = $path . '/data/fixit_tasks.yml';
+        try {
+            $raw = is_file($yamlPath) ? file_get_contents($yamlPath) : '';
+            $rows = is_string($raw) && $raw !== '' ? Yaml::decode($raw) : [];
+        }
+        catch (\Throwable) {
+            $rows = [];
+        }
+
+        $out = [];
+        if (is_array($rows)) {
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $isException = $row['exception'] ?? FALSE;
+                if ($isException !== TRUE) {
+                    continue;
+                }
+                $title = trim((string) ($row['title'] ?? ''));
+                $text = (string) ($row['exception_text'] ?? '');
+                if ($title !== '' && trim($text) !== '') {
+                    $out[$title] = $text;
+                }
+            }
+        }
+
+        return new JsonResponse([
+            'exceptions' => $out,
+        ]);
     }
 
     private function getLocationData($type, $facilityName = null): array {

@@ -1,5 +1,8 @@
 (function($) {
-  Drupal.behaviors.TMA = {
+  // IMPORTANT: Do not use the generic key "TMA" here.
+  // The webform YAML also injects inline JS that defines Drupal.behaviors.TMA,
+  // which can overwrite (or be overwritten by) this behavior depending on load order.
+  Drupal.behaviors.ucbTmaReport = {
     attach: function(context, settings) {
       /*
 	 Begin drupal behaviors
@@ -130,45 +133,116 @@
       /*
 		exception check
 	*/
+      function escapeHtml(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function ensureExceptionMapLoaded(cb) {
+        if (window.__ucbTmaExceptionMap) {
+          cb(window.__ucbTmaExceptionMap);
+          return;
+        }
+        if (window.__ucbTmaExceptionMapLoading) {
+          // Retry shortly until the first request finishes.
+          setTimeout(function() {
+            ensureExceptionMapLoaded(cb);
+          }, 100);
+          return;
+        }
+        window.__ucbTmaExceptionMapLoading = true;
+        $.getJSON("/tma/task-exceptions", function(resp) {
+          window.__ucbTmaExceptionMap = (resp && resp.exceptions) || {};
+          window.__ucbTmaExceptionMapLoading = false;
+          cb(window.__ucbTmaExceptionMap);
+        }).fail(function() {
+          window.__ucbTmaExceptionMap = {};
+          window.__ucbTmaExceptionMapLoading = false;
+          cb(window.__ucbTmaExceptionMap);
+        });
+      }
+
+      function selectedIssueTitle(el) {
+        var $el = $(el);
+        if ($el.is("select")) {
+          return ($el.find("option:selected").text() || "").trim();
+        }
+        // radio/checkbox fallback
+        var id = $el.attr("id");
+        if (id) {
+          var $label = $("label[for='" + id + "']");
+          if ($label.length) return ($label.text() || "").trim();
+        }
+        return ($el.val() || "").toString().trim();
+      }
+
       $(
-        "input[name=task_select], input[name=what_type_of_issue_would_you_like_to_report_]",
+        "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]",
         context
-      ).change(function() {
-        var aExceptions = $("#aException")
-          .html()
-          .split(",");
-        if (aExceptions.indexOf(this.value) != -1) {
-          $.colorbox({
-            width: "600px",
-            height: "400px",
-            inline: true,
-            title: " ",
-            href: "#exception_" + this.value
-          });
+      )
+        .off("change.ucbTmaException")
+        .on("change.ucbTmaException", function() {
+          var title = selectedIssueTitle(this);
+          if (!title) {
+            closeExceptionModal();
+            return;
+          }
+
+          ensureExceptionMapLoaded(function(map) {
+            var msg = map[title];
+            if (msg) {
+              ensureExceptionModal();
+              openExceptionModalHtml(
+                "<div class='exception-content'><h2>We're Sorry</h2>" +
+                  escapeHtml(msg) +
+                  "</div>" +
+                  "<div class='button-wrap'>" +
+                  "<a href='/' class='button' name='return_home'>Return Home</a>" +
+                  "<a class='button' name='okay'>OK</a>" +
+                  "</div>"
+              );
           $("#edit-input-information-related-to-the-issue").attr(
             "disabled",
             "disabled"
           );
           $("#edit-actions-wizard-next").attr("disabled", "disabled");
           $("#edit-actions-01-wizard-next").attr("disabled", "disabled");
-        } else {
-          $("#edit-input-information-related-to-the-issue").removeAttr(
-            "disabled"
-          );
-          $("#edit-actions-wizard-next").removeAttr("disabled");
-          $("#edit-actions-01-wizard-next").removeAttr("disabled");
-        }
-      });
+            } else {
+              closeExceptionModal();
+              $("#edit-input-information-related-to-the-issue").removeAttr(
+                "disabled"
+              );
+              $("#edit-actions-wizard-next").removeAttr("disabled");
+              $("#edit-actions-01-wizard-next").removeAttr("disabled");
+            }
+          });
+        });
 
       /*
 		click the okay button
 	*/
       $("a[name='okay']", context).click(function() {
-        $.colorbox.close();
+        closeExceptionModal();
         $(
-          "input[name=task_select], input[name=what_type_of_issue_would_you_like_to_report_]"
+          "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]"
         ).prop("checked", false);
       });
+
+      // The modal content is cloned into <body>, outside the webform context, so
+      // bind a document-level handler for the OK button too.
+      $(document)
+        .off("click.ucbTmaExceptionOkay")
+        .on("click.ucbTmaExceptionOkay", "#ucb-tma-exception-modal a[name='okay']", function(e) {
+          e.preventDefault();
+          closeExceptionModal();
+          $(
+            "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]"
+          ).prop("checked", false);
+        });
 
       /*
 	 end drupal behaviors
@@ -181,4 +255,71 @@ function htmlDecode(input) {
   var e = document.createElement("div");
   e.innerHTML = input;
   return e.childNodes.length === 0 ? "" : e.childNodes[0].nodeValue;
+}
+
+function ensureExceptionModal() {
+  if (document.getElementById("ucb-tma-exception-overlay")) {
+    return;
+  }
+  var overlay = document.createElement("div");
+  overlay.id = "ucb-tma-exception-overlay";
+  overlay.className = "ucb-tma-exception-modal-overlay";
+
+  var modal = document.createElement("div");
+  modal.id = "ucb-tma-exception-modal";
+  modal.className = "ucb-tma-exception-modal";
+
+  overlay.addEventListener("click", function() {
+    closeExceptionModal();
+  });
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(modal);
+
+  // ESC key closes the modal.
+  document.addEventListener("keydown", function(e) {
+    var key = e.key || e.keyCode;
+    if (key === "Escape" || key === "Esc" || key === 27) {
+      closeExceptionModal();
+    }
+  });
+}
+
+function openExceptionModal(exceptionId) {
+  var overlay = document.getElementById("ucb-tma-exception-overlay");
+  var modal = document.getElementById("ucb-tma-exception-modal");
+  if (!overlay || !modal) {
+    return;
+  }
+
+  var source = document.getElementById("exception_" + exceptionId);
+  if (!source) {
+    return;
+  }
+  // Clone the existing markup so button handlers still work.
+  modal.innerHTML = source.innerHTML;
+
+  overlay.style.display = "block";
+  modal.style.display = "block";
+}
+
+function openExceptionModalHtml(html) {
+  var overlay = document.getElementById("ucb-tma-exception-overlay");
+  var modal = document.getElementById("ucb-tma-exception-modal");
+  if (!overlay || !modal) {
+    return;
+  }
+  modal.innerHTML = html;
+  overlay.style.display = "block";
+  modal.style.display = "block";
+}
+
+function closeExceptionModal() {
+  var overlay = document.getElementById("ucb-tma-exception-overlay");
+  var modal = document.getElementById("ucb-tma-exception-modal");
+  if (overlay) overlay.style.display = "none";
+  if (modal) {
+    modal.style.display = "none";
+    modal.innerHTML = "";
+  }
 }
