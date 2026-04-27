@@ -1,0 +1,73 @@
+uuid: 38fff0e9-a432-4663-a20a-c07f3c96a15d
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.taxonomy_term.area.feeds_item
+    - field.field.taxonomy_term.area.field_floor
+    - field.field.taxonomy_term.area.field_tma_area_id
+    - field.field.taxonomy_term.area.field_tma_building_id_
+    - field.field.taxonomy_term.area.field_tma_description
+    - taxonomy.vocabulary.area
+  module:
+    - path
+    - text
+id: taxonomy_term.area.default
+targetEntityType: taxonomy_term
+bundle: area
+mode: default
+content:
+  description:
+    type: text_textfield
+    weight: 0
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  field_floor:
+    type: string_textfield
+    weight: 33
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  field_tma_area_id:
+    type: number
+    weight: 32
+    region: content
+    settings:
+      placeholder: ''
+    third_party_settings: {  }
+  field_tma_building_id_:
+    type: number
+    weight: 31
+    region: content
+    settings:
+      placeholder: ''
+    third_party_settings: {  }
+  field_tma_description:
+    type: string_textfield
+    weight: 34
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  name:
+    type: string_textfield
+    weight: -5
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  path:
+    type: path
+    weight: 30
+    region: content
+    settings: {  }
+    third_party_settings: {  }
+hidden:
+  feeds_item: true

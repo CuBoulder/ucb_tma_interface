@@ -1,0 +1,19 @@
+uuid: aba7980c-20fe-4633-93b2-32ca64e04ea1
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.taxonomy_term.field_tma_description
+    - taxonomy.vocabulary.area
+id: taxonomy_term.area.field_tma_description
+field_name: field_tma_description
+entity_type: taxonomy_term
+bundle: area
+label: 'TMA Description'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: string

@@ -1,0 +1,30 @@
+uuid: a7ccc534-5a13-481a-8d53-ce0f01b926df
+langcode: en
+status: true
+dependencies:
+  config:
+    - core.entity_view_mode.node.teaser
+    - field.field.node.task.field_exception
+    - field.field.node.task.field_exception_text
+    - field.field.node.task.field_parent_tile
+    - field.field.node.task.field_repair_center
+    - field.field.node.task.field_task_code
+    - node.type.task
+  module:
+    - user
+id: node.task.teaser
+targetEntityType: node
+bundle: task
+mode: teaser
+content:
+  links:
+    settings: {  }
+    third_party_settings: {  }
+    weight: 100
+    region: content
+hidden:
+  field_exception: true
+  field_exception_text: true
+  field_parent_tile: true
+  field_repair_center: true
+  field_task_code: true

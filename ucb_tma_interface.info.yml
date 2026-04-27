@@ -9,3 +9,8 @@ dependencies:
   - 'taxonomy:taxonomy'
   - 'node:node'
   - 'views:views'
+  - 'content_moderation:content_moderation'
+  - 'context:context'
+  - 'rdf:rdf'
+  - 'rest:rest'
+  - 'views_bulk_operations:views_bulk_operations'

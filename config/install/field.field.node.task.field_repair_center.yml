@@ -1,0 +1,23 @@
+uuid: f7f98765-0ab2-4b10-8ce8-7d2ed0ea43b5
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_repair_center
+    - node.type.task
+id: node.task.field_repair_center
+field_name: field_repair_center
+entity_type: node
+bundle: task
+label: 'Repair Center'
+description: ''
+required: false
+translatable: false
+default_value:
+  -
+    value: 0
+default_value_callback: ''
+settings:
+  on_label: 'On'
+  off_label: 'Off'
+field_type: boolean

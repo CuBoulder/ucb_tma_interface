@@ -1,0 +1,8 @@
+uuid: 8a6025fa-3e73-49ba-a1e6-ae8ed669af2d
+langcode: en
+status: true
+dependencies: {  }
+name: 'Issue Types'
+vid: categories
+description: 'A list of categories for the knowledge base articles'
+weight: 0

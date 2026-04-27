@@ -1,0 +1,23 @@
+uuid: 5f605205-02cb-46ba-a7f9-a1ce7f556956
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_exception
+    - node.type.task
+id: node.task.field_exception
+field_name: field_exception
+entity_type: node
+bundle: task
+label: Exception
+description: ''
+required: false
+translatable: false
+default_value:
+  -
+    value: 0
+default_value_callback: ''
+settings:
+  on_label: 'On'
+  off_label: 'Off'
+field_type: boolean

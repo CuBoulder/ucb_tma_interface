@@ -1,0 +1,8 @@
+uuid: a8fe6e32-c77e-40d6-acdd-63ee6701b142
+langcode: en
+status: true
+dependencies: {  }
+name: Facility
+vid: facility
+description: ''
+weight: 0

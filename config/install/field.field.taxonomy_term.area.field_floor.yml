@@ -1,0 +1,19 @@
+uuid: 736eb832-2ee1-4585-abb3-54cc4a106057
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.taxonomy_term.field_floor
+    - taxonomy.vocabulary.area
+id: taxonomy_term.area.field_floor
+field_name: field_floor
+entity_type: taxonomy_term
+bundle: area
+label: Floor
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: string

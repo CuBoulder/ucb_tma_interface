@@ -1,0 +1,17 @@
+uuid: 12d133e8-4da4-439d-a0bf-f18aa375fec4
+langcode: en
+status: true
+dependencies:
+  enforced:
+    module:
+      - webform
+_core:
+  default_config_hash: kiRN9cAGr7wLHbcnjCQ_9d8ArEoUUHytjjwMG_9mlTM
+id: gender
+label: Gender
+category: Demographic
+likert: false
+options: |
+  Male: Male
+  Female: Female
+  Transgender: Transgender

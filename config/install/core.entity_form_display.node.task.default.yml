@@ -1,0 +1,94 @@
+uuid: b87e60f6-905a-4a00-9fb2-1330f2835d49
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.node.task.field_exception
+    - field.field.node.task.field_exception_text
+    - field.field.node.task.field_parent_tile
+    - field.field.node.task.field_repair_center
+    - field.field.node.task.field_task_code
+    - node.type.task
+  module:
+    - content_moderation
+    - text
+id: node.task.default
+targetEntityType: node
+bundle: task
+mode: default
+content:
+  created:
+    type: datetime_timestamp
+    weight: 7
+    region: content
+    settings: {  }
+    third_party_settings: {  }
+  field_exception:
+    type: boolean_checkbox
+    weight: 4
+    region: content
+    settings:
+      display_label: true
+    third_party_settings: {  }
+  field_exception_text:
+    type: text_textarea
+    weight: 5
+    region: content
+    settings:
+      rows: 5
+      placeholder: ''
+    third_party_settings: {  }
+  field_parent_tile:
+    type: entity_reference_autocomplete
+    weight: 1
+    region: content
+    settings:
+      match_operator: CONTAINS
+      match_limit: 10
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  field_repair_center:
+    type: boolean_checkbox
+    weight: 101
+    region: content
+    settings:
+      display_label: true
+    third_party_settings: {  }
+  field_task_code:
+    type: string_textfield
+    weight: 2
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  moderation_state:
+    type: moderation_state_default
+    weight: 100
+    region: content
+    settings: {  }
+    third_party_settings: {  }
+  title:
+    type: string_textfield
+    weight: 0
+    region: content
+    settings:
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+  uid:
+    type: entity_reference_autocomplete
+    weight: 6
+    region: content
+    settings:
+      match_operator: CONTAINS
+      match_limit: 10
+      size: 60
+      placeholder: ''
+    third_party_settings: {  }
+hidden:
+  path: true
+  promote: true
+  status: true
+  sticky: true

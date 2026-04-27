@@ -1,0 +1,96 @@
+uuid: dfed33e0-f081-4601-accd-63b37e1a3621
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.taxonomy_term.area.field_floor
+    - field.field.taxonomy_term.area.field_tma_area_id
+    - field.field.taxonomy_term.area.field_tma_building_id_
+    - field.field.taxonomy_term.area.field_tma_description
+    - taxonomy.vocabulary.area
+  module:
+    - feeds_ex
+    - taxonomy
+label: 'TMA Area Import'
+id: tma_area_import
+description: ''
+help: null
+import_period: -1
+fetcher: http
+fetcher_configuration:
+  auto_detect_feeds: false
+  use_pubsubhubbub: false
+  always_download: false
+  fallback_hub: ''
+  request_timeout: 30
+parser: jsonpath
+parser_configuration:
+  context:
+    value: $[*]
+  source_encoding:
+    - auto
+  display_errors: false
+  line_limit: 100
+processor: 'entity:taxonomy_term'
+processor_configuration:
+  values:
+    vid: area
+  langcode: en
+  insert_new: 1
+  update_existing: 1
+  update_non_existent: _delete
+  skip_hash_check: false
+  authorize: false
+  expire: -1
+  owner_feed_author: false
+  owner_id: 0
+custom_sources:
+  a_name:
+    value: name
+    label: name
+    machine_name: a_name
+    type: json
+  a_connector:
+    value: connector
+    label: connector
+    machine_name: a_connector
+    type: json
+  pk:
+    value: pk
+    label: pk
+    machine_name: pk
+    type: json
+  floor_code:
+    value: floor_code
+    label: floor_code
+    machine_name: floor_code
+    type: json
+  description:
+    value: description
+    label: description
+    machine_name: description
+    type: json
+mappings:
+  -
+    target: name
+    map:
+      value: a_name
+    unique: {  }
+  -
+    target: field_tma_building_id_
+    map:
+      value: a_connector
+  -
+    target: field_tma_area_id
+    map:
+      value: pk
+  -
+    target: field_floor
+    map:
+      value: floor_code
+    unique: {  }
+  -
+    target: field_tma_description
+    map:
+      value: description
+    unique: {  }

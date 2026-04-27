@@ -1,0 +1,19 @@
+uuid: 3b6aa28c-3cad-45b9-a778-beccc0aaa50a
+langcode: en
+status: true
+dependencies:
+  module:
+    - node
+    - text
+id: node.field_exception_text
+field_name: field_exception_text
+entity_type: node
+type: text_long
+settings: {  }
+module: text
+locked: false
+cardinality: 1
+translatable: true
+indexes: {  }
+persist_with_no_fields: false
+custom_storage: false

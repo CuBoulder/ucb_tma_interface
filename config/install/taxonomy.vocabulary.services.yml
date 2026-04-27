@@ -1,0 +1,8 @@
+uuid: 4ebee0b0-ea0f-4187-8042-3811cacaa232
+langcode: en
+status: true
+dependencies: {  }
+name: Services
+vid: services
+description: 'Services available to request from HFS'
+weight: 0

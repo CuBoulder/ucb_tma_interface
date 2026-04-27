@@ -1,0 +1,61 @@
+uuid: fce108cf-b978-4135-83c6-747aae034367
+langcode: en
+status: true
+dependencies:
+  module:
+    - system
+label: 'Fix It experience Form'
+name: fix_it_experience_form
+group: page_layout
+description: ''
+requireAllConditions: false
+disabled: false
+conditions:
+  request_path:
+    id: request_path
+    negate: false
+    uuid: a89a4213-624d-4570-884f-fdc65894aaf6
+    context_mapping: {  }
+    pages: "/request-services-confirmation\r\n/report-a-problem-confirmation"
+reactions:
+  blocks:
+    id: blocks
+    uuid: 0db6a19f-78f8-468d-a1ea-cd92c85d4c67
+    blocks:
+      28f8ab64-8f23-4093-9406-3423f7fcee0e:
+        uuid: 28f8ab64-8f23-4093-9406-3423f7fcee0e
+        id: webform_block
+        label: Webform
+        provider: webform
+        label_display: '0'
+        region: content
+        weight: '0'
+        custom_id: webform_block
+        theme: particle
+        css_class: experience-form
+        unique: 0
+        context_id: fix_it_experience_form
+        context_mapping: {  }
+        webform_id: fix_it_survey
+        default_data: ''
+        redirect: 0
+      5463e5c4-df9d-4b5d-9712-9497858067c1:
+        uuid: 5463e5c4-df9d-4b5d-9712-9497858067c1
+        id: 'block_content:40b95c55-e97a-4e7c-88c3-d252bf35f50d'
+        label: 'Return Home'
+        provider: block_content
+        label_display: '0'
+        region: content
+        weight: '1'
+        custom_id: block_content_40b95c55_e97a_4e7c_88c3_d252bf35f50d
+        theme: particle
+        css_class: return-home
+        unique: 0
+        context_id: fix_it_experience_form
+        context_mapping: {  }
+        status: true
+        info: ''
+        view_mode: full
+    include_default_blocks: 1
+    saved: false
+weight: 0

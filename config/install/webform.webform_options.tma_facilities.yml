@@ -1,0 +1,16 @@
+uuid: 2a575c2d-ccec-4e02-8d80-57ed072e08d8
+langcode: en
+status: true
+dependencies: {  }
+id: tma_facilities
+label: 'TMA Facilities'
+category: ''
+likert: false
+options: |
+  'Bear Creek': 'Bear Creek'
+  'Central Campus': 'Central Campus'
+  'East Campus': 'East Campus'
+  'Graduate and Family Housing': 'Graduate and Family Housing'
+  Grounds: Grounds
+  'Kittredge Loop': 'Kittredge Loop'
+  'Williams Village': 'Williams Village'

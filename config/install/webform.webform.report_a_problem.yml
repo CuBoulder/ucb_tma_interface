@@ -1,0 +1,399 @@
+uuid: 893bcc0c-915b-4cee-a8a6-d6cce1ba1b1b
+langcode: en
+status: open
+dependencies: {  }
+_core:
+  default_config_hash: SUQcfDmMyGhNFuH0Ve-4aq_usvbOgd37_escMfJUw4E
+weight: 0
+open: null
+close: null
+uid: 2
+template: false
+archive: false
+id: report_a_problem
+title: 'Report a problem'
+description: ''
+categories: {  }
+elements: |-
+  know_your_issue_:
+    '#type': webform_wizard_page
+    '#title': 'Know your Issue? '
+    categories:
+      '#type': webform_entity_radios
+      '#title': 'Know Your Issue? '
+      '#target_type': taxonomy_term
+      '#selection_handler': 'default:taxonomy_term'
+      '#selection_settings':
+        target_bundles:
+          categories: categories
+        sort:
+          field: name
+          direction: ASC
+    actions:
+      '#type': webform_actions
+      '#title': 'Submit button(s)'
+      '#attributes':
+        class:
+          - page-button
+      '#submit__label': Submit
+      '#wizard_prev__label': Back
+      '#wizard_next__label': Next
+      '#wizard_next__attributes':
+        class:
+          - '[webform_submission:current-page]_next_button'
+      '#preview_prev__label': Back
+      '#preview_next__label': Next
+  step_1:
+    '#type': webform_wizard_page
+    '#title': 'Issue Type'
+    '#prev_button_label': Back
+    '#next_button_label': Next
+    issue_type_wrapper:
+      '#type': fieldset
+      '#title': 'Issue Type Wrapper'
+      '#title_display': invisible
+      '#attributes':
+        class:
+          - card-wrapper
+      cancel:
+        '#type': webform_markup
+        '#wrapper_attributes':
+          class:
+            - '[webform_submission:current-page]_cancel'
+        '#markup': '<a href="/node/3">Cancel</a>'
+      task_select:
+        '#type': webform_entity_select
+        '#title': 'Issue Type'
+        '#required': true
+        '#empty_option': '- Select an issue type -'
+        '#target_type': node
+        '#selection_handler': views
+        '#selection_settings':
+          view:
+            view_name: task_selection
+            display_name: entity_reference_1
+            arguments:
+              - '[webform_submission:values:categories:entity:tid]'
+      input_information_related_to_the_issue:
+        '#type': textarea
+        '#title': 'Input information related to the issue'
+        '#placeholder': 'Add comments here'
+        '#required': true
+        '#counter_type': character
+        '#counter_maximum': 150
+      actions_01:
+        '#type': webform_actions
+        '#title': 'Submit button(s)'
+        '#attributes':
+          class:
+            - page-button
+        '#submit__label': Submit
+        '#wizard_prev__label': Back
+        '#wizard_next__label': Next
+        '#wizard_next__attributes':
+          class:
+            - '[webform_submission:current-page]_next_button'
+        '#preview_prev__label': Back
+        '#preview_next__label': Next
+    faq:
+      '#type': webform_markup
+      '#wrapper_attributes':
+        style: 'display:none'
+      '#markup': '[webform_submission:values:categories:entity:tid]'
+  step_2:
+    '#type': webform_wizard_page
+    '#title': 'Location & Contact'
+    '#prev_button_label': Back
+    '#next_button_label': Next
+    location_and_contact_wrapper:
+      '#type': fieldset
+      '#title': 'Location and Contact Wrapper'
+      '#title_display': invisible
+      '#attributes':
+        class:
+          - card-wrapper
+      markup:
+        '#type': webform_markup
+        '#wrapper_attributes':
+          class:
+            - '[webform_submission:current-page]_cancel'
+        '#markup': '<a href="/node/3">Cancel</a>'
+      facility:
+        '#type': select
+        '#title': Facility
+        '#options': tma_facilities
+        '#required': true
+      building:
+        '#type': select
+        '#title': Building
+        '#options':
+          Placeholder: Placeholder
+        '#required': true
+        '#states':
+          enabled:
+            ':input[name="facility"]':
+              filled: true
+      area:
+        '#type': select
+        '#title': Area
+        '#options':
+          Placeholder: Placeholder
+        '#required': true
+        '#states':
+          enabled:
+            ':input[name="building"]':
+              filled: true
+      user_contact:
+        '#type': webform_contact
+        '#title': Contact
+        '#required': true
+        '#name__placeholder': 'Name Here'
+        '#name__title_display': before
+        '#name__required': true
+        '#company__access': false
+        '#email__placeholder': 'Email Here'
+        '#email__title_display': before
+        '#email__required': true
+        '#phone__placeholder': 'Phone Here'
+        '#phone__title_display': before
+        '#phone__required': true
+        '#address__access': false
+        '#address_2__access': false
+        '#city__access': false
+        '#state_province__access': false
+        '#postal_code__access': false
+        '#country__access': false
+      actions_02:
+        '#type': webform_actions
+        '#title': 'Submit button(s)'
+        '#attributes':
+          class:
+            - page-button
+        '#submit__label': Submit
+        '#wizard_prev__label': Back
+        '#wizard_next__label': Next
+        '#wizard_next__attributes':
+          class:
+            - '[webform_submission:current-page]_next_button'
+        '#preview_prev__label': Back
+        '#preview_next__label': Next
+      floor:
+        '#type': hidden
+        '#title': floor
+  ticket_id:
+    '#type': hidden
+    '#title': 'Ticket ID'
+  repair_center:
+    '#type': hidden
+    '#title': 'Repair Center'
+  actions_03:
+    '#type': webform_actions
+    '#title': 'Submit button(s)'
+    '#attributes':
+      class:
+        - preview-button
+    '#submit__label': Submit
+    '#wizard_prev__label': Back
+    '#wizard_next__label': Next
+    '#wizard_next__attributes':
+      class:
+        - '[webform_submission:current-page]_next_button'
+    '#preview_prev__label': Back
+    '#preview_next__label': Next
+css: ".form-group.js-form-item.form-item.js-form-type-radio.form-item-categories.js-form-item-categories:has(> #edit-categories-16202) {\r\n  display: none;\r\n}"
+javascript: "(function($) {\r\n\tDrupal.behaviors.TMA = {\r\n\t\tattach: function(context, settings) {\r\n/*\r\n\t Begin drupal behaviors\r\n*/\r\n\r\n\t/*\r\n\t\t auto submit on button select\r\n\t*/\r\n    $(\"#edit-categories input, #edit-services input\", context).on(\"mouseup\", function() {\r\n\t\tlabelID = $(this).attr(\"data-drupal-selector\");\r\n        //alert(\"You clicked on : \" + labelID); \r\n\t\t$(\"#\" + labelID).trigger(\"click\");\r\n\t\t$(\"#edit-actions-wizard-next\").trigger(\"click\");\r\n\t});\r\n       \r\n    $(\"#edit-categories label, #edit-services label\", context).on(\"mouseup\", function() {\r\n\t\tlabelID = $(this).attr(\"for\");\r\n        //alert(\"You clicked on : \" + labelID); \r\n\t\t$(\"#\" + labelID).trigger(\"click\");\r\n\t\t$(\"#edit-actions-wizard-next\").trigger(\"click\");\r\n\t});\r\n\t/*\r\n\t\t load building selector\r\n\t*/\r\n\t$(\"select[name=facility]\", context).change(function() {\r\n\t\tvar dropdown = $(\"select[name=building]\");\r\n\t\tdropdown.empty();\r\n\t\tdropdown.append(\r\n\t\t$(\"<option></option>\")\r\n\t\t.attr(\"value\", \"\")\r\n\t\t.text(\"Select a Building\")\r\n\t\t);\r\n\t\tdropdown.prop(\"selectedIndex\", 0);\r\n\t\t$(\"select[name=area]\").empty();\r\n\t\t$(\"select[name=area]\").append(\r\n\t\t$(\"<option></option>\")\r\n\t\t.attr(\"value\", \"\")\r\n\t\t.text(\"- None -\")\r\n\t\t);\r\n\t\t$(\"select[name=area]\").prop(\"selectedIndex\", 0);\r\n\t\t// get facility ID\r\n\t\tvar url = \"/rest/facility/\" + this.value;\r\n\t\t$.getJSON(url, function(data) {\r\n\t\t\t$.each(data, function(key, entry) {\r\n\t\t\t\turl = \"/rest/buildings/\" + entry.field_tma_facility_id;\r\n\t\t\t\t// Populate dropdown with list of buildings in facility\r\n\t\t\t\t$.getJSON(url, function(data) {\r\n\t\t\t\t\t$.each(data, function(key, entry) {\r\n\t\t\t\t\t\tdropdown.append(\r\n\t\t\t\t\t\t$(\"<option></option>\")\r\n\t\t\t\t\t\t\t.attr(\"value\", entry.field_tma_building_id_)\r\n\t\t\t\t\t\t\t.text(htmlDecode(entry.name))\r\n\t\t\t\t\t\t);\r\n\t\t\t\t\t});\r\n\t\t\t\t});\r\n\t\t\t});       \r\n\t\t});\r\n\t});\r\n\r\n\t/*\r\n\t\tload area selector\r\n\t*/\r\n\t$(\"select[name=building]\", context).change(function() {\r\n\t\tvar dropdown = $(\"select[name=area]\");\r\n\t\tdropdown.empty();\r\n\t\tdropdown.append(\r\n\t\t$(\"<option></option>\")\r\n\t\t\t.attr(\"value\", \"\")\r\n\t\t\t.text(\"Select an Area\")\r\n\t\t);\r\n\t\tdropdown.prop(\"selectedIndex\", 0);\r\n\r\n\t\t// Add loading icon\r\n\t\t$(\"#edit-area\").addClass(\"loading\");\r\n\t\t$(\".loading\").after('<p id=\"loader-icon\">&nbsp;</p>');\r\n\r\n\t\t// Building dropdown stores numeric building id as value.\r\n\t\t// Avoid putting building names in the URL (names can contain '/' which breaks routing).\r\n\t\tvar buildingId = this.value;\r\n\t\tif (!buildingId) {\r\n\t\t\t$(\"#loader-icon\").hide();\r\n\t\t\treturn;\r\n\t\t}\r\n\r\n\t\tvar url = \"/rest/areas/\" + buildingId;\r\n\t\t// Populate dropdown with list of areas in building\r\n\t\t$.getJSON(url, function(data) {\r\n\t\t\t$.each(data, function(key, entry) {\r\n\t\t\t\tdropdown.append(\r\n\t\t\t\t$(\"<option></option>\")\r\n\t\t\t\t\t.attr(\"value\", htmlDecode(entry.name))\r\n\t\t\t\t\t.text(entry.name + \", \" + entry.field_tma_description)\r\n\t\t\t\t);\r\n\t\t\t});\r\n\t\t\t// Hide Loading icon\r\n\t\t\t$(\"#loader-icon\").hide();\r\n\t\t});\r\n\t});\r\n\r\n\r\n\t/*\r\n\t\texception check\r\n\t*/\r\n\t$(\"input[name=task_select], input[name=what_type_of_issue_would_you_like_to_report_]\", context).change(function() {\r\n\t\tvar raw = $(\"#aException\").html();\r\n\t\tvar aExceptions = (typeof raw === \"string\" && raw.length)\r\n\t\t\t? raw.split(\",\").map(function(v) { return v.trim(); }).filter(Boolean)\r\n\t\t\t: [];\r\n\r\n\t\tif (aExceptions.indexOf(this.value) !== -1) {\r\n\t\t\tif ($.colorbox) {\r\n\t\t\t\t$.colorbox({\r\n\t\t\t\t\twidth:\"600px\",\r\n\t\t\t\t\theight:\"400px\",\r\n\t\t\t\t\tinline:true,\r\n\t\t\t\t\ttitle:\" \",\r\n\t\t\t\t\thref: '#exception_'+this.value\r\n\t\t\t\t});\r\n\t\t\t}\r\n\t\t\t$('#edit-input-information-related-to-the-issue').attr(\"disabled\", \"disabled\");\r\n\t\t\t$('#edit-actions-wizard-next').attr(\"disabled\", \"disabled\");\r\n\t\t  \t$('#edit-actions-01-wizard-next').attr(\"disabled\", \"disabled\");\r\n\t\t} else {\r\n\t\t\t$('#edit-input-information-related-to-the-issue').removeAttr(\"disabled\");\r\n\t\t\t$('#edit-actions-wizard-next').removeAttr(\"disabled\");\r\n\t\t  \t$('#edit-actions-01-wizard-next').removeAttr(\"disabled\");\r\n\t\t}\r\n\t});\r\n\r\n\t/*\r\n\t\tclick the okay button\r\n\t*/\r\n\t$(\"a[name='okay']\", context).click( function() {\r\n\t\tif ($.colorbox && $.colorbox.close) {\r\n\t\t\t$.colorbox.close();\r\n\t\t}\r\n        $(\"input[name=task_select], input[name=what_type_of_issue_would_you_like_to_report_]\").prop(\"checked\", false);\r\n\t});\r\n\r\n\t/* \r\n\t\t  auto-submit smiley faces\r\n\t*/\r\n    $(\".webform-submission-fix-it-survey-node-5-add-form label\", context).on(\r\n        \"mouseup\",\r\n        function() {\r\n          labelID = $(this).attr(\"for\");\r\n          $(\"#\" + labelID).trigger(\"click\");\r\n          $(\".webform-submission-fix-it-survey-node-5-add-form #edit-actions-submit\").trigger(\"click\");\r\n        }\r\n      );\r\n\r\n/*\r\n\t end drupal behaviors\r\n*/\r\n\t\t}\r\n\t};\r\n})(jQuery);\r\n\r\n\r\nfunction htmlDecode(input) {\r\n\tvar e = document.createElement(\"div\");\r\n\te.innerHTML = input;\r\n\treturn e.childNodes.length === 0 ? \"\" : e.childNodes[0].nodeValue;\r\n}\r\n\r\n"
+settings:
+  ajax: false
+  ajax_scroll_top: form
+  ajax_progress_type: ''
+  ajax_effect: ''
+  ajax_speed: null
+  page: true
+  page_submit_path: /report-a-problem
+  page_confirm_path: /report-a-problem-confirmation
+  page_theme_name: ''
+  form_title: source_entity_webform
+  form_submit_once: false
+  form_open_message: ''
+  form_close_message: ''
+  form_exception_message: ''
+  form_previous_submissions: true
+  form_confidential: false
+  form_confidential_message: ''
+  form_disable_remote_addr: false
+  form_convert_anonymous: false
+  form_prepopulate: false
+  form_prepopulate_source_entity: false
+  form_prepopulate_source_entity_required: false
+  form_prepopulate_source_entity_type: ''
+  form_unsaved: false
+  form_disable_back: false
+  form_submit_back: false
+  form_disable_autocomplete: false
+  form_novalidate: false
+  form_disable_inline_errors: false
+  form_required: false
+  form_autofocus: false
+  form_details_toggle: false
+  form_reset: false
+  form_access_denied: default
+  form_access_denied_title: ''
+  form_access_denied_message: ''
+  form_access_denied_attributes: {  }
+  form_file_limit: ''
+  form_attributes: {  }
+  form_method: ''
+  form_action: ''
+  share: false
+  share_node: false
+  share_theme_name: ''
+  share_title: true
+  share_page_body_attributes: {  }
+  submission_label: ''
+  submission_exception_message: ''
+  submission_locked_message: ''
+  submission_log: false
+  submission_excluded_elements: {  }
+  submission_exclude_empty: false
+  submission_exclude_empty_checkbox: false
+  submission_views: {  }
+  submission_views_replace: {  }
+  submission_user_columns: {  }
+  submission_user_duplicate: false
+  submission_access_denied: default
+  submission_access_denied_title: ''
+  submission_access_denied_message: ''
+  submission_access_denied_attributes: {  }
+  previous_submission_message: ''
+  previous_submissions_message: ''
+  autofill: false
+  autofill_message: ''
+  autofill_excluded_elements: {  }
+  wizard_progress_bar: true
+  wizard_progress_pages: false
+  wizard_progress_percentage: false
+  wizard_progress_link: false
+  wizard_progress_states: false
+  wizard_start_label: ''
+  wizard_preview_link: true
+  wizard_confirmation: false
+  wizard_confirmation_label: ''
+  wizard_auto_forward: true
+  wizard_auto_forward_hide_next_button: false
+  wizard_keyboard: true
+  wizard_track: index
+  wizard_prev_button_label: ''
+  wizard_next_button_label: ''
+  wizard_toggle: false
+  wizard_toggle_show_label: ''
+  wizard_toggle_hide_label: ''
+  wizard_page_type: container
+  wizard_page_title_tag: h2
+  preview: 2
+  preview_label: 'Summary & Submit'
+  preview_title: 'Request Summary'
+  preview_message: ''
+  preview_attributes:
+    class:
+      - preview-summary
+  preview_excluded_elements:
+    categories: categories
+  preview_exclude_empty: true
+  preview_exclude_empty_checkbox: false
+  draft: none
+  draft_multiple: false
+  draft_auto_save: false
+  draft_saved_message: ''
+  draft_loaded_message: ''
+  draft_pending_single_message: ''
+  draft_pending_multiple_message: ''
+  confirmation_type: page
+  confirmation_url: ''
+  confirmation_title: 'Submission Complete'
+  confirmation_message: "<span>Thank you!</span>\r\n<p><strong>You&#39;ve completed your TMA FixIt Request</strong></p>\r\n\r\n<p>Ticket #<strong>[webform_submission:values:ticket_id]</strong> has been submitted. We will keep you updated with the progress.</p>"
+  confirmation_attributes: {  }
+  confirmation_back: false
+  confirmation_back_label: ''
+  confirmation_back_attributes: {  }
+  confirmation_exclude_query: false
+  confirmation_exclude_token: false
+  confirmation_update: false
+  limit_total: null
+  limit_total_interval: null
+  limit_total_message: ''
+  limit_total_unique: false
+  limit_user: null
+  limit_user_interval: null
+  limit_user_message: ''
+  limit_user_unique: false
+  entity_limit_total: null
+  entity_limit_total_interval: null
+  entity_limit_user: null
+  entity_limit_user_interval: null
+  purge: none
+  purge_days: null
+  results_disabled: false
+  results_disabled_ignore: false
+  results_customize: false
+  token_view: false
+  token_update: false
+  token_delete: false
+  serial_disabled: false
+access:
+  create:
+    roles:
+      - anonymous
+      - authenticated
+    users: {  }
+    permissions: {  }
+  view_any:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  update_any:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  delete_any:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  purge_any:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  view_own:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  update_own:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  delete_own:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  administer:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  test:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+  configuration:
+    roles: {  }
+    users: {  }
+    permissions: {  }
+handlers:
+  ucb_tma_form_handler:
+    id: ucb_tma_form_handler
+    handler_id: ucb_tma_form_handler
+    label: 'UCB TMA form handler'
+    notes: ''
+    status: true
+    conditions: {  }
+    weight: 0
+    settings: {  }
+variants: {  }

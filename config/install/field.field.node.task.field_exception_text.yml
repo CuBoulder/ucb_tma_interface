@@ -1,0 +1,21 @@
+uuid: 624c928a-8c47-4367-ba56-66e10329a15c
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_exception_text
+    - node.type.task
+  module:
+    - text
+id: node.task.field_exception_text
+field_name: field_exception_text
+entity_type: node
+bundle: task
+label: 'Exception Text'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings: {  }
+field_type: text_long

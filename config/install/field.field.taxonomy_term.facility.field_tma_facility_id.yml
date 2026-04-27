@@ -1,0 +1,23 @@
+uuid: 9638bb30-4741-4bf4-b7f7-029a42272bec
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.taxonomy_term.field_tma_facility_id
+    - taxonomy.vocabulary.facility
+id: taxonomy_term.facility.field_tma_facility_id
+field_name: field_tma_facility_id
+entity_type: taxonomy_term
+bundle: facility
+label: 'TMA Facility ID'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  min: null
+  max: null
+  prefix: ''
+  suffix: ''
+field_type: integer

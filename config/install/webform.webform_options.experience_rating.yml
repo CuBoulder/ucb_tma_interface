@@ -1,0 +1,12 @@
+uuid: d122a271-d1be-452c-b191-136c4f0a5433
+langcode: en
+status: true
+dependencies: {  }
+id: experience_rating
+label: 'Experience Rating'
+category: Likert
+likert: true
+options: |
+  1: Bad
+  2: Neutral
+  3: Good

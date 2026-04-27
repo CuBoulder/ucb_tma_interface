@@ -1,0 +1,23 @@
+uuid: 67c3f55f-c88b-439a-89fd-d54daa130f4b
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.taxonomy_term.field_tma_area_id
+    - taxonomy.vocabulary.area
+id: taxonomy_term.area.field_tma_area_id
+field_name: field_tma_area_id
+entity_type: taxonomy_term
+bundle: area
+label: 'TMA Area ID'
+description: ''
+required: false
+translatable: false
+default_value: {  }
+default_value_callback: ''
+settings:
+  min: null
+  max: null
+  prefix: ''
+  suffix: ''
+field_type: integer
