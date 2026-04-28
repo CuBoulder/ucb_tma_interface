@@ -10,7 +10,6 @@ dependencies:
     - field.field.node.task.field_task_code
     - node.type.task
   module:
-    - content_moderation
     - text
 id: node.task.default
 targetEntityType: node
