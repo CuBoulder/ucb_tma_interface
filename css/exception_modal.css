@@ -48,3 +48,21 @@
   background: #6b7280;
 }
 
+/* Loader for populating rooms in a building after selecting that building */
+#loader-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 8px 0 0 8px;
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  border-top-color: rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  animation: ucb-tma-spin 0.8s linear infinite;
+}
+
+@keyframes ucb-tma-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

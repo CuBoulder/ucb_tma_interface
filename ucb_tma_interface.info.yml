@@ -9,4 +9,3 @@ dependencies:
   - 'taxonomy:taxonomy'
   - 'node:node'
   - 'views:views'
-  - 'rest:rest'

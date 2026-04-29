@@ -7,24 +7,92 @@
       /*
 	 Begin drupal behaviors
 */
-
+// Only 
       /*
 		 auto submit on button select
 	*/
-      $("#edit-categories label, #edit-services label", context).on(
-        "mouseup",
-        function() {
-          labelID = $(this).attr("for");
-          $("#" + labelID).trigger("click");
-          $("#edit-actions-wizard-next").trigger("click");
+      // Keep auust the two FixIt webforms that need wizard auto-advance.
+      function inFixitReportOrRequestForm(el) {
+        var $el = $(el);
+        return (
+          $el.closest("form[id^='webform-submission-report-a-problem']").length ||
+          $el.closest("form[id^='webform-submission-request-services']").length
+        );
+      }
+
+      // Click the enabled "Next" button for the current wizard page.
+      function clickWizardNext($scope) {
+        // Webform wizard next buttons can be numbered depending on which actions
+        // element is on the current page.
+        var $btn = $scope
+          .find(
+            "#edit-actions-wizard-next, #edit-actions-01-wizard-next, #edit-actions-02-wizard-next"
+          )
+          .filter(":enabled")
+          .first();
+        if ($btn.length) {
+          $btn.trigger("click");
         }
-      );
+      }
+
+      // Advance the wizard from an event target's form (async to let selection update first).
+      function scheduleNextClickWithin(el) {
+        var $form = $(el).closest("form");
+        if (!$form.length) {
+          return;
+        }
+        setTimeout(function() {
+          clickWizardNext($form);
+        }, 0);
+      }
+
+      // Use delegated events so this keeps working across Webform AJAX rebuilds.
+      $(document)
+        .off("click.ucbTmaAutoAdvance", "#edit-categories label, #edit-services label")
+        .on("click.ucbTmaAutoAdvance", "#edit-categories label, #edit-services label", function() {
+          if (!inFixitReportOrRequestForm(this)) {
+            return;
+          }
+          var labelID = $(this).attr("for");
+          if (labelID) {
+            $("#" + labelID).trigger("click");
+          }
+          scheduleNextClickWithin(this);
+        });
+
+      $(document)
+        .off("change.ucbTmaAutoAdvance", "#edit-categories input, #edit-services input")
+        .on("change.ucbTmaAutoAdvance", "#edit-categories input, #edit-services input", function() {
+          if (!inFixitReportOrRequestForm(this)) {
+            return;
+          }
+          scheduleNextClickWithin(this);
+        });
 
       /*
 		 load building selector
 	*/
-      $("select[name=facility]", context).change(function() {
-        var dropdown = $("select[name=building]");
+      // Facility -> Building: populate the Building dropdown for the selected Facility.
+      function handleFacilityChange(el) {
+        // Cache results across the page to avoid repeated requests and keep UI snappy.
+        window.__ucbTmaLocCache = window.__ucbTmaLocCache || {
+          facilitiesByName: null, // { [facilityName]: facilityPk }
+          buildingsByFacilityPk: {}, // { [facilityPk]: buildings[] }
+          areasByFacilityName: {} // { [facilityName]: areas[] }
+        };
+
+        var $form = $(el).closest("form");
+        var dropdown = $form.find("select[name=building]");
+        // Cancel any previous in-flight building fetch for this form.
+        try {
+          var prevXhr = $form.data("ucbTmaXhrBuildings");
+          if (prevXhr && prevXhr.abort) prevXhr.abort();
+        } catch (e) {}
+
+        // Generation token: callbacks must match current token to write.
+        // This prevents stale/out-of-order async callbacks from duplicating options.
+        var gen = ($form.data("ucbTmaGenBuildings") || 0) + 1;
+        $form.data("ucbTmaGenBuildings", gen);
         dropdown.empty();
         dropdown.append(
           $("<option></option>")
@@ -32,58 +100,136 @@
             .text("Select a Building")
         );
         dropdown.prop("selectedIndex", 0);
-        $("select[name=area]").empty();
-        $("select[name=area]").append(
+        var $area = $form.find("select[name=area]");
+        $area.empty();
+        $area.append(
           $("<option></option>")
             .attr("value", "")
             .text("- None -")
         );
-        $("select[name=area]").prop("selectedIndex", 0);
+        $area.prop("selectedIndex", 0);
         // Facility dropdown stores the facility name as value (legacy webform design).
         // Fetch all buildings and filter client-side by facility connector (facility id).
-        var selectedFacilityName = this.value;
+        var selectedFacilityName = $(el).val();
         if (!selectedFacilityName) {
           return;
         }
 
-        var facilityNameUrl = "/tma/location/facility";
-        $.getJSON(facilityNameUrl, function(facilities) {
-          var facilityId = null;
-          $.each(facilities, function(_, f) {
-            if (f && f.name === selectedFacilityName) {
-              facilityId = f.pk;
-              return false;
-            }
-          });
-          if (!facilityId) {
+        // Render-from-scratch so repeated callbacks never accumulate duplicate <option>s.
+        function renderBuildings(buildings) {
+          if (($form.data("ucbTmaGenBuildings") || 0) !== gen) {
             return;
           }
+          dropdown.empty();
+          dropdown.append(
+            $("<option></option>").attr("value", "").text("Select a Building")
+          );
+          dropdown.prop("selectedIndex", 0);
 
-          var buildingsUrl = "/tma/location/building";
-          $.getJSON(buildingsUrl, function(buildings) {
-            $.each(buildings, function(_, b) {
-              if (!b) {
-                return;
-              }
-              // builder maps connector => facilityId
-              if (String(b.connector) !== String(facilityId)) {
-                return;
-              }
-              dropdown.append(
-                $("<option></option>")
-                  .attr("value", b.pk)
-                  .text(htmlDecode(b.name))
-              );
-            });
+          var seen = {};
+          $.each(buildings || [], function(_, b) {
+            if (!b) return;
+            var pk = b.pk;
+            if (pk === undefined || pk === null) return;
+            var key = String(pk);
+            if (seen[key]) return;
+            seen[key] = true;
+            dropdown.append(
+              $("<option></option>").attr("value", String(pk)).text(htmlDecode(b.name))
+            );
           });
+        }
+
+        // Resolve facility name -> facility pk (cached after first load).
+        function ensureFacilityMap(cb) {
+          if (window.__ucbTmaLocCache.facilitiesByName) {
+            cb(window.__ucbTmaLocCache.facilitiesByName);
+            return;
+          }
+          $.getJSON("/tma/location/facility", function(facilities) {
+            var map = {};
+            $.each(facilities || [], function(_, f) {
+              if (f && f.name && f.pk) {
+                map[String(f.name)] = f.pk;
+              }
+            });
+            window.__ucbTmaLocCache.facilitiesByName = map;
+            cb(map);
+          }).fail(function() {
+            window.__ucbTmaLocCache.facilitiesByName = {};
+            cb(window.__ucbTmaLocCache.facilitiesByName);
+          });
+        }
+
+        // Fetch all buildings once, then cache filtered subsets by facility pk.
+        function ensureBuildingsForFacility(facilityPk, cb) {
+          var key = String(facilityPk);
+          if (window.__ucbTmaLocCache.buildingsByFacilityPk[key]) {
+            cb(window.__ucbTmaLocCache.buildingsByFacilityPk[key]);
+            return;
+          }
+          var xhr = $.getJSON("/tma/location/building", function(buildings) {
+            var filtered = [];
+            $.each(buildings || [], function(_, b) {
+              if (!b) return;
+              if (String(b.connector) !== String(facilityPk)) return;
+              filtered.push(b);
+            });
+            window.__ucbTmaLocCache.buildingsByFacilityPk[key] = filtered;
+            cb(filtered);
+          }).fail(function() {
+            window.__ucbTmaLocCache.buildingsByFacilityPk[key] = [];
+            cb([]);
+          });
+          return xhr;
+        }
+
+        ensureFacilityMap(function(map) {
+          if (($form.data("ucbTmaGenBuildings") || 0) !== gen) {
+            return;
+          }
+          var facilityPk = map[selectedFacilityName] || null;
+          if (!facilityPk) return;
+          var xhr = ensureBuildingsForFacility(facilityPk, function(buildings) {
+            renderBuildings(buildings);
+          });
+          if (xhr) {
+            $form.data("ucbTmaXhrBuildings", xhr);
+          }
         });
-      });
+      }
+
+      // Delegated binding so Webform AJAX rebuilds don't double-bind.
+      $(document)
+        .off(
+          "change.ucbTmaLoc",
+          "form[id^='webform-submission-report-a-problem'] select[name=facility], form[id^='webform-submission-request-services'] select[name=facility]"
+        )
+        .on(
+          "change.ucbTmaLoc",
+          "form[id^='webform-submission-report-a-problem'] select[name=facility], form[id^='webform-submission-request-services'] select[name=facility]",
+          function() {
+            handleFacilityChange(this);
+          }
+        );
 
       /*
 		load area selector
 	*/
-      $("select[name=building]", context).change(function() {
-        var dropdown = $("select[name=area]");
+      // Building -> Area: populate the Area dropdown for the selected Building.
+      function handleBuildingChange(el) {
+        var $form = $(el).closest("form");
+        var dropdown = $form.find("select[name=area]");
+        // Cancel any previous in-flight area fetch for this form.
+        try {
+          var prevXhr = $form.data("ucbTmaXhrAreas");
+          if (prevXhr && prevXhr.abort) prevXhr.abort();
+        } catch (e) {}
+
+        // Generation token: callbacks must match current token to write.
+        // This prevents stale/out-of-order async callbacks from duplicating options.
+        var gen = ($form.data("ucbTmaGenAreas") || 0) + 1;
+        $form.data("ucbTmaGenAreas", gen);
         dropdown.empty();
         dropdown.append(
           $("<option></option>")
@@ -93,21 +239,52 @@
         dropdown.prop("selectedIndex", 0);
 
         // Add loading icon
-        $("#edit-area").addClass("loading");
-        $(".loading").after('<p id="loader-icon">&nbsp;</p>');
+        $form.find("#edit-area").addClass("loading");
+        if (!document.getElementById("loader-icon")) {
+          $form.find(".loading").after('<p id="loader-icon">&nbsp;</p>');
+        }
 
         // Building dropdown stores numeric building id as value.
         // Avoid putting building names in the URL (names can contain '/' which breaks routing).
-        var buildingId = this.value;
+        var buildingId = $(el).val();
         if (!buildingId) {
           $("#loader-icon").hide();
           return;
         }
 
-        // Areas endpoint is keyed by facility name, so we fetch all areas and filter by building connector.
-        var url = "/tma/location/area";
-        $.getJSON(url, function(data) {
-          $.each(data, function(_, entry) {
+        // Always-visible loader state (works even if theme hides #loader-icon).
+        dropdown
+          .append($("<option></option>").attr("value", "").text("Loading areas…"))
+          .prop("selectedIndex", 1);
+
+        // fetch only areas for the selected facility (campus chunk), then filter by building id.
+        var facilityName = $form.find("select[name=facility]").val() || "";
+        var cacheKey = String(facilityName);
+        window.__ucbTmaLocCache = window.__ucbTmaLocCache || { areasByFacilityName: {} };
+
+        // Append an option only if its value doesn't already exist in the <select>.
+        function appendUniqueOption($select, value, text) {
+          var v = String(value);
+          if ($select.find("option[value='" + v.replace(/'/g, "\\'") + "']").length) {
+            return;
+          }
+          $select.append($("<option></option>").attr("value", v).text(text));
+        }
+
+        // Render-from-scratch and de-dupe by area name for safety.
+        function renderAreas(data) {
+          if (($form.data("ucbTmaGenAreas") || 0) !== gen) {
+            return;
+          }
+          // Reset options and rebuild; this also removes the "Loading…" option.
+          dropdown.empty();
+          dropdown.append(
+            $("<option></option>").attr("value", "").text("Select an Area")
+          );
+          dropdown.prop("selectedIndex", 0);
+
+          var seen = {};
+          $.each(data || [], function(_, entry) {
             if (!entry) {
               return;
             }
@@ -115,24 +292,69 @@
             if (String(entry.connector) !== String(buildingId)) {
               return;
             }
+            var rawName = String(entry.name || "");
+            if (rawName === "") {
+              return;
+            }
+            var seenKey = rawName;
+            if (seen[seenKey]) {
+              return;
+            }
+            seen[seenKey] = true;
             var label = entry.name;
             if (entry.description) {
               label = entry.name + ", " + entry.description;
             }
-            dropdown.append(
-              $("<option></option>")
-                .attr("value", htmlDecode(entry.name))
-                .text(htmlDecode(label))
-            );
+            appendUniqueOption(dropdown, htmlDecode(entry.name), htmlDecode(label));
           });
-          // Hide Loading icon
+          $("#loader-icon").hide();
+        }
+
+        if (facilityName && window.__ucbTmaLocCache.areasByFacilityName[cacheKey]) {
+          renderAreas(window.__ucbTmaLocCache.areasByFacilityName[cacheKey]);
+          return;
+        }
+
+        var url = facilityName
+          ? "/tma/location/area/" + encodeURIComponent(facilityName)
+          : "/tma/location/area";
+        var xhr = $.getJSON(url, function(data) {
+          if (facilityName) {
+            window.__ucbTmaLocCache.areasByFacilityName[cacheKey] = data || [];
+          }
+          renderAreas(data);
+        }).fail(function() {
+          // Clear loading state on fail
+          dropdown.empty();
+          dropdown.append(
+            $("<option></option>").attr("value", "").text("Select an Area")
+          );
+          dropdown.prop("selectedIndex", 0);
           $("#loader-icon").hide();
         });
-      });
+        if (xhr) {
+          $form.data("ucbTmaXhrAreas", xhr);
+        }
+      }
+
+      // Delegated binding so Webform AJAX rebuilds don't double-bind.
+      $(document)
+        .off(
+          "change.ucbTmaLoc",
+          "form[id^='webform-submission-report-a-problem'] select[name=building], form[id^='webform-submission-request-services'] select[name=building]"
+        )
+        .on(
+          "change.ucbTmaLoc",
+          "form[id^='webform-submission-report-a-problem'] select[name=building], form[id^='webform-submission-request-services'] select[name=building]",
+          function() {
+            handleBuildingChange(this);
+          }
+        );
 
       /*
 		exception check
 	*/
+      // Escape exception text for safe HTML rendering inside the modal.
       function escapeHtml(s) {
         return String(s)
           .replace(/&/g, "&amp;")
@@ -142,6 +364,7 @@
           .replace(/'/g, "&#039;");
       }
 
+      // Fetch and cache exception messages (title -> exception_text) from /tma/task-exceptions.
       function ensureExceptionMapLoaded(cb) {
         if (window.__ucbTmaExceptionMap) {
           cb(window.__ucbTmaExceptionMap);
@@ -166,6 +389,7 @@
         });
       }
 
+      // Get the selected task title (works for both <select> and radio inputs).
       function selectedIssueTitle(el) {
         var $el = $(el);
         if ($el.is("select")) {
@@ -251,12 +475,14 @@
   };
 })(jQuery);
 
+// Decode entity-escaped strings coming from legacy-shaped JSON feeds.
 function htmlDecode(input) {
   var e = document.createElement("div");
   e.innerHTML = input;
   return e.childNodes.length === 0 ? "" : e.childNodes[0].nodeValue;
 }
 
+// Create the modal DOM once (overlay + modal container) and wire close handlers.
 function ensureExceptionModal() {
   if (document.getElementById("ucb-tma-exception-overlay")) {
     return;
@@ -285,6 +511,7 @@ function ensureExceptionModal() {
   });
 }
 
+// Legacy helper: open modal content from an existing hidden DOM node.
 function openExceptionModal(exceptionId) {
   var overlay = document.getElementById("ucb-tma-exception-overlay");
   var modal = document.getElementById("ucb-tma-exception-modal");
@@ -303,6 +530,7 @@ function openExceptionModal(exceptionId) {
   modal.style.display = "block";
 }
 
+// Preferred helper: open modal from an HTML string (used by /tma/task-exceptions mapping).
 function openExceptionModalHtml(html) {
   var overlay = document.getElementById("ucb-tma-exception-overlay");
   var modal = document.getElementById("ucb-tma-exception-modal");
@@ -314,6 +542,7 @@ function openExceptionModalHtml(html) {
   modal.style.display = "block";
 }
 
+// Close and clear the modal contents.
 function closeExceptionModal() {
   var overlay = document.getElementById("ucb-tma-exception-overlay");
   var modal = document.getElementById("ucb-tma-exception-modal");
