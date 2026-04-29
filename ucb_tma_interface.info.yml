@@ -10,4 +10,3 @@ dependencies:
   - 'node:node'
   - 'views:views'
   - 'rest:rest'
-  - 'views_bulk_operations:views_bulk_operations'
