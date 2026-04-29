@@ -8,7 +8,9 @@ location_data:
 report:
   version: 1.x
   js:
-    js/report.js: {}
+    js/fixit_wizard_ux.js: {}
+    js/fixit_location_cascade.js: {}
+    js/fixit_exception_modal.js: {}
   css:
     theme:
       css/exception_modal.css: {}
