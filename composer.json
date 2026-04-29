@@ -1,0 +1,6 @@
+{
+        "name": "cu-boulder/ucb_tma_interface",
+        "description": "Handles all interactions and requests to and from the TMA Systems webTMA APIv7",
+        "license": "GPL-2.0-or-later",
+        "type": "drupal-custom-module"
+}
