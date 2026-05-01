@@ -3,7 +3,6 @@ langcode: en
 status: true
 dependencies:
   config:
-    - field.field.taxonomy_term.facility.feeds_item
     - field.field.taxonomy_term.facility.field_tma_facility_id
     - taxonomy.vocabulary.facility
   module:
@@ -30,4 +29,3 @@ content:
     weight: 1
     region: content
 hidden:
-  feeds_item: true

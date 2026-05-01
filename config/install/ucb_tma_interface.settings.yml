@@ -1,15 +1,8 @@
-# legacy
-request_url: "https://tma.colorado.edu/webtma/Webservice/Mobile.svc/AdministrationBusinessObjects/iRequest"
-locations_url: "https://tma.colorado.edu/webtma/Webservice/Mobile.svc/OrganizationBusinessObjects/"
-authentication_url: "https://tma.colorado.edu/tmalogin/webservice/mobilelogin.svc/AuthenticateUser"
 # v7
 authentication_user: "FIXIT"
 authentication_pass: ""
 authentication_client_name: "ucb"
 base_url: "https://devtma7.colorado.edu/webTMA7/platformapi"
-# Optional. Base URL Feeds uses for /tma/location/* (Drush/CLI has no real hostname without this).
-# Example (DDEV): https://mysite.ddev.site
-feeds_base_url: ""
 
 # When enabled, logs request/response payloads for debugging.
 # WARNING: may include requestor PII (name/email/phone) and request text.

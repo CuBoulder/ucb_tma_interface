@@ -3,7 +3,6 @@ langcode: en
 status: true
 dependencies:
   config:
-    - field.field.taxonomy_term.area.feeds_item
     - field.field.taxonomy_term.area.field_floor
     - field.field.taxonomy_term.area.field_tma_area_id
     - field.field.taxonomy_term.area.field_tma_building_id_
@@ -58,4 +57,3 @@ content:
     weight: 4
     region: content
 hidden:
-  feeds_item: true
