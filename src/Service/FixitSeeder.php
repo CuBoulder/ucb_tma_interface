@@ -3,7 +3,6 @@
 namespace Drupal\ucb_tma_interface\Service;
 
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\taxonomy\Entity\Term;
 use Symfony\Component\Yaml\Yaml;
 
@@ -11,165 +10,13 @@ final class FixitSeeder {
 
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
     private readonly TmaLocationFeedPayloadBuilder $locationFeedPayload,
   ) {}
 
   /**
-   * Base URL Feeds should use for HTTP GET to this site’s /tma/location/* JSON routes.
-   *
-   * In web requests this is usually correct from the request context. In Drush/CLI there
-   * is often no host; set config feeds_base_url or rely on DDEV_PRIMARY_URL.
-   */
-  public function resolveFeedsBaseUrl(): string {
-    $config = \Drupal::config('ucb_tma_interface.settings');
-    $explicit = trim((string) ($config->get('feeds_base_url') ?? ''));
-    if ($explicit !== '') {
-      return rtrim($explicit, '/');
-    }
-
-    $ddev = getenv('DDEV_PRIMARY_URL');
-    if (is_string($ddev) && $ddev !== '') {
-      return rtrim($ddev, '/');
-    }
-
-    try {
-      $base = \Drupal::service('router.request_context')->getCompleteBaseUrl();
-      if (is_string($base) && $base !== '' && !preg_match('#://default($|/)#', $base)) {
-        return rtrim($base, '/');
-      }
-    }
-    catch (\Throwable) {
-    }
-
-    if (!empty($GLOBALS['base_url']) && is_string($GLOBALS['base_url'])) {
-      return rtrim($GLOBALS['base_url'], '/');
-    }
-
-    // Legacy default (production); wrong for local dev if nothing else is set.
-    return 'https://fixit.colorado.edu';
-  }
-
-  /**
-   * Ensure the standard Fixit Feeds feed instances exist.
-   *
-   * Also updates the `source` URL on existing feeds when the resolved base URL changes
-   * (e.g. after setting feeds_base_url or switching DDEV projects).
-   */
-  public function ensureFeedsExist(): int {
-    if (!$this->moduleHandler->moduleExists('feeds')) {
-      throw new \RuntimeException('feeds module is not enabled.');
-    }
-
-    $base = $this->resolveFeedsBaseUrl();
-    $logger = \Drupal::logger('ucb_tma_interface');
-    $logger->notice('Feeds: using site base URL @base for /tma/location sources.', ['@base' => $base]);
-
-    $feeds = [
-      [
-        'type' => 'tma_facility_import',
-        'title' => 'TMA Facility',
-        'source' => $base . '/tma/location/facility',
-      ],
-      [
-        'type' => 'tma_building_import',
-        'title' => 'TMA Building',
-        'source' => $base . '/tma/location/building',
-      ],
-    ];
-
-    foreach (TmaLocationFeedPayloadBuilder::FEEDS_AREA_CAMPUS_NAMES as $campus) {
-      $feeds[] = [
-        'type' => 'tma_area_import',
-        'title' => 'TMA Areas - ' . $campus,
-        'source' => $base . '/tma/location/area/' . rawurlencode($campus),
-      ];
-    }
-
-    $storage = $this->entityTypeManager->getStorage('feeds_feed');
-    $created = 0;
-
-    foreach ($feeds as $f) {
-      $existing = $storage->loadByProperties([
-        'type' => $f['type'],
-        'title' => $f['title'],
-      ]);
-      if ($existing) {
-        /** @var \Drupal\feeds\Entity\Feed $entity */
-        $entity = reset($existing);
-        $current = (string) $entity->getSource();
-        if ($current !== $f['source']) {
-          $entity->setSource($f['source']);
-          $entity->save();
-          $logger->notice('Feeds: updated source for @title → @url', [
-            '@title' => $f['title'],
-            '@url' => $f['source'],
-          ]);
-        }
-        continue;
-      }
-      $e = $storage->create([
-        'type' => $f['type'],
-        'title' => $f['title'],
-        'source' => $f['source'],
-        'status' => 1,
-        'uid' => 1,
-      ]);
-      $e->save();
-      $created++;
-    }
-
-    return $created;
-  }
-
-  /**
-   * Import all feeds (facility/building/area).
-   *
-   * @return array{imported:int, failed:int}
-   */
-  public function importAllFeeds(): array {
-    if (!$this->moduleHandler->moduleExists('feeds')) {
-      throw new \RuntimeException('feeds module is not enabled.');
-    }
-
-    if (\function_exists('set_time_limit')) {
-      @set_time_limit(0);
-    }
-
-    $logger = \Drupal::logger('ucb_tma_interface');
-    $storage = $this->entityTypeManager->getStorage('feeds_feed');
-    $feeds = $storage->loadMultiple();
-
-    $imported = 0;
-    $failed = 0;
-
-    foreach ($feeds as $feed) {
-      try {
-        $logger->notice('Feeds: starting import for @title.', [
-          '@title' => $feed->label(),
-        ]);
-        // Feeds then logs its own result (e.g. "Created N … items") to the log.
-        $feed->import();
-        $imported++;
-      }
-      catch (\Throwable $e) {
-        $failed++;
-        $logger->error('Feeds: import failed for @title: @msg', [
-          '@title' => $feed->label(),
-          '@msg' => $e->getMessage(),
-        ]);
-      }
-    }
-
-    return ['imported' => $imported, 'failed' => $failed];
-  }
-
-  /**
    * Import facility, building, and area taxonomy directly from the Platform API (v7).
    *
-   * Used by default from Drush because Feeds fetches /tma/location/* via HTTP, which
-   * often returns empty JSON in CLI/cron contexts; this path uses the same service as
-   * the admin UI (JWT + columns=… on list endpoints).
+   * This uses the same legacy-shaped JSON builder as /tma/location/*.
    *
    * @return array<string, int>
    */

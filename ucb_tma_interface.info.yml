@@ -5,7 +5,6 @@ package: custom
 core_version_requirement: ^11
 dependencies:
   - 'webform:webform'
-  - 'feeds:feeds'
   - 'taxonomy:taxonomy'
   - 'node:node'
   - 'views:views'
