@@ -9,8 +9,6 @@
 namespace Drupal\ucb_tma_interface\InterfaceController;
 
 use Drupal\ucb_tma_interface\ApiConnector\PlatformConnector;
-use Drupal\ucb_tma_interface\ApiConnector\TmaConnector;
-use Drupal\ucb_tma_interface\FixitRequest\FixitRequestHandler;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,33 +31,9 @@ use Drupal\Component\Serialization\Yaml;
  */
 class TmaFrontController {
 
-    // Key mappings for location data. Used for maintainability, maps the Web Teams names to the TMA Names.
-    // This way we always call our own names and simply update the TMA names if they change.
-    private const TMA_KEYS = [
-        "data" => "NewDataSet",
-        "pk" => "PK",
-        "facility" => "f_facility",
-        "facility_name" => "fd_name",
-        "facility_connector" => "fd_code",
-        "facility_active" => "fd_active",
-        "building" => "f_building",
-        "building_name" => "fb_name",
-        "building_connector" => "fd_pk",
-        "building_active" => "fb_active",
-        "area" => "f_area",
-        "area_name" => "fu_unitID",
-        "area_connector" => "fu_fb_fk",
-        "area_active" => "fu_active",
-        "area_description" => "fu_description",
-        "area_exclude" => "fu_excludeFromRequestor",
-        "floor_code" => "ff_code"
-    ];
-
-    private $connector;
     private $config;
 
     public function __construct() {
-        $this->connector = new TmaConnector();
         $this->config = \Drupal::config('ucb_tma_interface.settings');
     }
 
@@ -67,46 +41,39 @@ class TmaFrontController {
      * @return array|\Psr\Http\Message\ResponseInterface
      */
     public function submitFixitRequest($request) {
-        // Prefer Platform API v7 (Bearer JWT) when configured; fall back to legacy Mobile/iRequest.
+        // v7-only: submit via Platform API (Bearer JWT).
         $platformBase = rtrim((string) $this->config->get('base_url'), '/');
-        if ($platformBase !== '') {
-            $platform = \Drupal::service('ucb_tma_interface.platform_connector');
-            if ($platform instanceof PlatformConnector) {
-                $reqData = is_array($request) ? $request : [];
-                // WorkRequest (code-based) matches legacy Fix It behavior; direct WorkOrders POST
-                // often fails for area locations with server-side FK / nullable binding errors.
-                $payload = $this->buildPlatformWorkRequestPayload($reqData, $platform);
-                if ($payload === NULL) {
-                    return $this->buildPlatformSubmissionErrorResponse('Could not resolve TMA facility or building codes for WorkRequest.');
-                }
-                $this->debugLog('v7.before', [
-                    'incoming' => $this->sanitizeForLog($reqData),
-                    'payload' => $this->sanitizeForLog($payload),
-                ]);
-                $resp = $platform->postJson('/v2/WorkRequest', $payload);
-                $resp = $this->maybeWrapWorkRequestResponseAsLegacyIlog($platform, $reqData, $payload, $resp);
-                $this->debugLog('v7.after', $this->formatResponseForLog($resp));
-                return $resp;
-            }
+        if ($platformBase === '') {
+            return $this->buildPlatformSubmissionErrorResponse('Missing Platform API base_url. Configure /admin/config/tma.');
         }
 
-        $fixitHandler = new FixitRequestHandler($request);
-        $legacyBody = $fixitHandler->formatRequest();
-        $this->debugLog('v5.before', [
-            'incoming' => $this->sanitizeForLog(is_array($request) ? $request : []),
-            // v5 payload is JSON string; decode if possible for nicer logging.
-            'payload' => $this->sanitizeForLog(json_decode($legacyBody, TRUE) ?: ['raw' => $this->truncate((string) $legacyBody)]),
+        $platform = \Drupal::service('ucb_tma_interface.platform_connector');
+        if (!$platform instanceof PlatformConnector) {
+            return $this->buildPlatformSubmissionErrorResponse('Platform connector service is unavailable.');
+        }
+
+        $reqData = is_array($request) ? $request : [];
+        // WorkRequest (code-based) matches legacy Fix It behavior; direct WorkOrders POST
+        // often fails for area locations with server-side FK / nullable binding errors.
+        $payload = $this->buildPlatformWorkRequestPayload($reqData, $platform);
+        if ($payload === NULL) {
+            return $this->buildPlatformSubmissionErrorResponse('Could not resolve TMA facility or building codes for WorkRequest.');
+        }
+        $this->debugLog('v7.before', [
+            'incoming' => $this->sanitizeForLog($reqData),
+            'payload' => $this->sanitizeForLog($payload),
         ]);
-        $resp = $this->connector->sendRequest($this->config->get('request_url'), $legacyBody);
-        $this->debugLog('v5.after', $this->formatResponseForLog($resp));
+        $resp = $platform->postJson('/v2/WorkRequest', $payload);
+        $resp = $this->maybeWrapWorkRequestResponseAsLegacyIlog($platform, $reqData, $payload, $resp);
+        $this->debugLog('v7.after', $this->formatResponseForLog($resp));
         return $resp;
     }
 
     /**
-     * When Platform WorkRequest succeeds, return a legacy-shaped iRequest response body.
+     * When Platform WorkRequest succeeds, return a legacy-shaped response body.
      *
-     * This keeps downstream behavior (ticket_id, confirmation pages, existing parsing)
-     * as close to the v5 Mobile/iRequest integration as possible.
+     * This keeps downstream behavior (ticket_id extraction, confirmation pages, existing parsing)
+     * stable without retaining any v5 Mobile/iRequest submission path.
      */
     private function maybeWrapWorkRequestResponseAsLegacyIlog(PlatformConnector $platform, array $reqData, array $payload, mixed $resp): mixed {
         if (!$resp instanceof ResponseInterface) {
@@ -207,13 +174,6 @@ class TmaFrontController {
 
         $body = json_encode($legacy, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return new Response(200, ['Content-Type' => 'application/json'], $body ?: '{}');
-    }
-
-    /**
-     * @return array|\Psr\Http\Message\ResponseInterface
-     */
-    public function getFixitRequest() {
-        return $this->connector->getResponse($this->config->get('request_url'));
     }
 
     /**

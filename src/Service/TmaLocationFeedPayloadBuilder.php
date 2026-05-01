@@ -33,7 +33,7 @@ final class TmaLocationFeedPayloadBuilder {
   ) {}
 
   /**
-   * Legacy JSON rows for Feeds / Drush — identical shape to old Mobile.svc simpleArea output.
+   * Legacy-shaped JSON rows for taxonomy seeding and webform dropdowns.
    *
    * @param string $kind
    *   "Facility", "Building", or "Area".
