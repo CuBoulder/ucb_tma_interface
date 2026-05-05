@@ -115,6 +115,9 @@ function ucb_tma_interface_webform_submission_form_alter(array &$form, \Drupal\C
 		if ($webform_id === 'report_a_problem' || $webform_id === 'request_services') {
 			$form['#attached']['library'][] = 'ucb_tma_interface/report';
 		}
+		if ($webform_id === 'fix_it_survey') {
+			$form['#attached']['library'][] = 'ucb_tma_interface/ucb-fixit-survey';
+		}
 	}
 	catch (\Throwable) {
 		// Ignore.

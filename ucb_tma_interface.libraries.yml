@@ -18,3 +18,9 @@ report:
     - core/jquery
     - core/drupal
     - core/once
+
+ucb-fixit-survey:
+  version: 1.x
+  css:
+    theme:
+      css/ucb-fixit-survey.css: { weight: 5 }
