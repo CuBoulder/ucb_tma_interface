@@ -96,10 +96,16 @@
       }
 
       function disableNext(disabled) {
-        var action = disabled ? "attr" : "removeAttr";
-        $("#edit-input-information-related-to-the-issue")[action]("disabled", "disabled");
-        $("#edit-actions-wizard-next")[action]("disabled", "disabled");
-        $("#edit-actions-01-wizard-next")[action]("disabled", "disabled");
+        var d = !!disabled;
+        var $forms = $(
+          "form[id^='webform-submission-report-a-problem'], form[id^='webform-submission-request-services']"
+        );
+        $forms
+          .find(
+            "input.webform-button--next:visible, button.webform-button--next:visible, input.webform-button--preview:visible, button.webform-button--preview:visible"
+          )
+          .prop("disabled", d);
+        $forms.find("#edit-input-information-related-to-the-issue").prop("disabled", d);
       }
 
       $(
@@ -139,6 +145,7 @@
       $("a[name='okay']", context).off("click.ucbTmaExceptionOkay").on("click.ucbTmaExceptionOkay", function (e) {
         e.preventDefault();
         closeExceptionModal();
+        disableNext(false);
         $(
           "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]"
         ).prop("checked", false);
@@ -149,6 +156,7 @@
         .on("click.ucbTmaExceptionOkay", "#ucb-tma-exception-modal a[name='okay']", function (e) {
           e.preventDefault();
           closeExceptionModal();
+          disableNext(false);
           $(
             "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]"
           ).prop("checked", false);

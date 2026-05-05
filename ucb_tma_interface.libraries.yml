@@ -6,7 +6,7 @@ location_data:
     - core/jquery
 
 report:
-  version: 1.x
+  version: 1.1
   js:
     js/fixit_wizard_ux.js: {}
     js/fixit_location_cascade.js: {}
@@ -16,3 +16,5 @@ report:
       css/exception_modal.css: {}
   dependencies:
     - core/jquery
+    - core/drupal
+    - core/once

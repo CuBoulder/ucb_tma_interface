@@ -55,6 +55,12 @@ elements: |-
       '#attributes':
         class:
           - card-wrapper
+      cancel:
+        '#type': webform_markup
+        '#wrapper_attributes':
+          class:
+            - '[webform_submission:current-page]_cancel'
+        '#markup': '<a href="/node/3">Cancel</a>'
       task_select:
         '#type': webform_entity_select
         '#title': 'Issue Type'
@@ -106,6 +112,12 @@ elements: |-
       '#attributes':
         class:
           - card-wrapper
+      markup:
+        '#type': webform_markup
+        '#wrapper_attributes':
+          class:
+            - '[webform_submission:current-page]_cancel'
+        '#markup': '<a href="/node/3">Cancel</a>'
       facility:
         '#type': select
         '#title': Facility
@@ -174,6 +186,20 @@ elements: |-
   repair_center:
     '#type': hidden
     '#title': 'Repair Center'
+  actions_03:
+    '#type': webform_actions
+    '#title': 'Submit button(s)'
+    '#attributes':
+      class:
+        - preview-button
+    '#submit__label': Submit
+    '#wizard_prev__label': Back
+    '#wizard_next__label': Next
+    '#wizard_next__attributes':
+      class:
+        - '[webform_submission:current-page]_next_button'
+    '#preview_prev__label': Back
+    '#preview_next__label': Next
 css: ".form-group.js-form-item.form-item.js-form-type-radio.form-item-categories.js-form-item-categories:has(> #edit-categories-16202) {\r\n  display: none;\r\n}"
 javascript: ''
 settings:
@@ -249,7 +275,7 @@ settings:
   wizard_progress_link: false
   wizard_progress_states: false
   wizard_start_label: ''
-  wizard_preview_link: false
+  wizard_preview_link: true
   wizard_confirmation: false
   wizard_confirmation_label: ''
   wizard_auto_forward: true
@@ -263,7 +289,7 @@ settings:
   wizard_toggle_hide_label: ''
   wizard_page_type: container
   wizard_page_title_tag: h2
-  preview: 0
+  preview: 2
   preview_label: 'Summary & Submit'
   preview_title: 'Request Summary'
   preview_message: ''

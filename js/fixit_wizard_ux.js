@@ -1,7 +1,16 @@
-(function ($) {
+(function ($, Drupal, once) {
   // FixIt wizard UX helpers: auto-advance after selecting category/service.
   Drupal.behaviors.ucbTmaFixitWizardUx = {
     attach: function (context) {
+      var fixitFormSelector =
+        "form[id^='webform-submission-report-a-problem'], form[id^='webform-submission-request-services']";
+      // Show root preview actions only on the preview step (Drupal 10+ core `once`, not jQuery.fn.once).
+      $(once("ucbTmaPreviewButtons", fixitFormSelector, context)).each(function () {
+        var $form = $(this);
+        var isPreview = $form.find(".webform-preview").length > 0;
+        $form.find(".preview-button").toggle(isPreview);
+      });
+
       function inFixitReportOrRequestForm(el) {
         var $el = $(el);
         return (
@@ -11,15 +20,38 @@
       }
 
       function clickWizardNext($scope) {
-        // Webform wizard next buttons can be numbered depending on which actions element is present.
+        // Prefer Webform/DOM hints that survive nested webform_actions IDs (actions, actions_01, …).
+        // Use :submit (covers both <input type="submit"> and <button type="submit">); avoid :visible,
+        // which can miss valid wizard controls depending on layout/CSS.
         var $btn = $scope
           .find(
-            "#edit-actions-wizard-next, #edit-actions-01-wizard-next, #edit-actions-02-wizard-next"
+            ":submit.webform-button--next, :submit.webform-button--preview, button.webform-button--next, button.webform-button--preview"
           )
           .filter(":enabled")
           .first();
+        if (!$btn.length) {
+          $btn = $scope
+            .find(
+              '[data-drupal-selector$="-wizard-next"], [data-drupal-selector$="-preview-next"]'
+            )
+            .filter(":enabled")
+            .first();
+        }
+        if (!$btn.length) {
+          $btn = $scope
+            .find(
+              "#edit-actions-wizard-next, #edit-actions-01-wizard-next, #edit-actions-02-wizard-next, #edit-actions-03-wizard-next"
+            )
+            .filter(":enabled")
+            .first();
+        }
         if ($btn.length) {
-          $btn.trigger("click");
+          var el = $btn.get(0);
+          if (el && typeof el.click === "function") {
+            el.click();
+          } else {
+            $btn.trigger("click");
+          }
         }
       }
 
@@ -64,5 +96,4 @@
         );
     },
   };
-})(jQuery);
-
+})(jQuery, Drupal, once);
