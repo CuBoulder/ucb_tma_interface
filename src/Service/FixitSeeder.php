@@ -319,22 +319,8 @@ final class FixitSeeder {
       return $term;
     };
 
-    $findExistingTask = static function (string $title, string $parentName, int $parentTid, string $parentVid, ?string $taskCode) use ($nodeStorage): ?int {
-      $taskCode = trim((string) $taskCode);
-
-      if ($taskCode !== '') {
-        $nids = \Drupal::entityQuery('node')
-          ->accessCheck(FALSE)
-          ->condition('type', 'task')
-          ->condition('field_task_code', $taskCode)
-          ->range(0, 1)
-          ->execute();
-        if ($nids) {
-          return (int) reset($nids);
-        }
-      }
-
-      // Fallback: find by title, then disambiguate by parent term *name* so we
+    $findExistingTask = static function (string $title, string $parentName, int $parentTid, string $parentVid) use ($nodeStorage): ?int {
+      // Find by title, then disambiguate by parent term *name* so we
       // can safely migrate between vocabularies without creating duplicates.
       $nids = \Drupal::entityQuery('node')
         ->accessCheck(FALSE)
@@ -380,7 +366,9 @@ final class FixitSeeder {
         }
       }
 
-      return (int) reset($nids);
+      // No safe match. Create a new node instead of reusing an arbitrary one, because titles can legitimately repeat across different parent tiles
+      // Happens when same label in both categories and services!
+      return NULL;
     };
 
     $created = 0;
@@ -428,7 +416,7 @@ final class FixitSeeder {
       $parentTid = (int) $term->id();
       $parentVid = (string) $term->bundle();
 
-      $existingNid = $findExistingTask($title, $parentName, $parentTid, $parentVid, is_string($taskCode) ? $taskCode : '');
+      $existingNid = $findExistingTask($title, $parentName, $parentTid, $parentVid);
 
       if ($existingNid) {
         $node = $nodeStorage->load($existingNid);
