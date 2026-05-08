@@ -60,7 +60,7 @@ elements: |-
         '#wrapper_attributes':
           class:
             - '[webform_submission:current-page]_cancel'
-        '#markup': '<a href="/node/3">Cancel</a>'
+        '#markup': '<a href="/">Cancel</a>'
       task_select:
         '#type': webform_entity_select
         '#title': 'Issue Type'
@@ -117,7 +117,7 @@ elements: |-
         '#wrapper_attributes':
           class:
             - '[webform_submission:current-page]_cancel'
-        '#markup': '<a href="/node/3">Cancel</a>'
+        '#markup': '<a href="/">Cancel</a>'
       facility:
         '#type': select
         '#title': Facility
