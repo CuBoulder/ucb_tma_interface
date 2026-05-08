@@ -416,7 +416,7 @@
   parent_tile: Internet - A/V - Computers
   task_code: null
   exception: true
-  exception_text: "To report issues with Staff Computers, Audio Visual (A/V) Equipment or Printers Owned by the University of Colorado, please call Student Affairs Information Technology (SAIT) at 303-735-4357."
+  exception_text: "To report issues with Staff Computers, Audio Visual (A/V) Equipment or Printers Owned by the University of Colorado, please call Student Life Technology Services (SLTS) at 303-735-4357."
   repair_center: false
 - title: Issues with Card Readers
   parent_tile: Laundry
