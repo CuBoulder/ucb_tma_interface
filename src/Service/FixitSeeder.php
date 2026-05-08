@@ -248,25 +248,6 @@ final class FixitSeeder {
       }
     };
 
-    // Ensure a catch-all Services term exists (even if no tasks reference it).
-    try {
-      $existingOther = $termStorage->loadByProperties(['vid' => 'services', 'name' => 'Other']);
-      if (!$existingOther) {
-        $t = Term::create([
-          'vid' => 'services',
-          'name' => 'Other',
-          'status' => 1,
-        ]);
-        $t->save();
-        if ($verbose) {
-          $log('notice', 'Created services term "Other" (tid=@tid).', ['@tid' => (int) $t->id()]);
-        }
-      }
-    }
-    catch (\Throwable $e) {
-      $log('warning', 'Unable to ensure services term "Other": @err', ['@err' => $e->getMessage()]);
-    }
-
     $allowedParentVids = [];
     try {
       $probe = $nodeStorage->create(['type' => 'task']);
