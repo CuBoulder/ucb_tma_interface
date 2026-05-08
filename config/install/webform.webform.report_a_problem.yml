@@ -63,10 +63,9 @@ elements: |-
             - '[webform_submission:current-page]_cancel'
         '#markup': '<a href="/">Cancel</a>'
       task_select:
-        '#type': webform_entity_select
+        '#type': webform_entity_radios
         '#title': 'Issue Type'
         '#required': true
-        '#empty_option': '- Select an issue type -'
         '#target_type': node
         '#selection_handler': views
         '#selection_settings':
