@@ -16,7 +16,37 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
     if(array_key_exists("#webform_id", $element)) {
 		if ($element['#webform_id'] === 'report_a_problem--building' || $element['#webform_id'] === 'request_services--building') {
 			if (isset($element['#default_value']) && strlen($element['#default_value'])) {
-				$building_name = $element['#default_value'];
+				$building_default = (string) $element['#default_value'];
+				$building_name = $building_default;
+				$building_pk = is_numeric($building_default) ? (int) $building_default : 0;
+
+				// If an old submission stored the numeric building PK, build a minimal pk=>name
+				// map so previews/edit forms show the human label instead of "31".
+				if ($building_pk > 0) {
+					try {
+						$builder = \Drupal::service('ucb_tma_interface.location_feed_payload');
+						$buildings = is_object($builder) && method_exists($builder, 'getFeedItems') ? $builder->getFeedItems('Building', NULL) : [];
+						if (is_array($buildings)) {
+							foreach ($buildings as $b) {
+								if (!is_array($b)) {
+									continue;
+								}
+								if ((int) ($b['pk'] ?? 0) !== $building_pk) {
+									continue;
+								}
+								$name = $b['name'] ?? NULL;
+								if (is_string($name) && $name !== '') {
+									$element['#options'] = [(string) $building_pk => (string) $name];
+									break;
+								}
+							}
+						}
+					}
+					catch (\Throwable $e) {
+						// Ignore; fallback behavior will display the raw stored value.
+					}
+				}
+
 				// Prefer the Platform-backed location routes, not legacy /rest/* endpoints.
 				// Select facility id from building taxonomy.
 				$query = \Drupal::database()->select('taxonomy_term_field_data', 'fn');

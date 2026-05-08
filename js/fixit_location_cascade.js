@@ -75,8 +75,14 @@
           var key = String(pk);
           if (seen[key]) return;
           seen[key] = true;
+          var name = htmlDecode(b.name);
           $building.append(
-            $("<option></option>").attr("value", String(pk)).text(htmlDecode(b.name))
+            $("<option></option>")
+              // Store the label as the submitted value
+              .attr("value", String(name))
+              // Keep the numeric PK for area filtering
+              .attr("data-ucb-tma-pk", String(pk))
+              .text(name)
           );
         });
       }
@@ -143,7 +149,9 @@
       function handleBuildingChange(el) {
         initCache();
         var $form = $(el).closest("form");
-        var buildingId = $(el).val();
+        // The select value is the building name; use the data attribute for numeric PK
+        var $sel = $(el);
+        var buildingId = $sel.find("option:selected").attr("data-ucb-tma-pk") || "";
         var facilityName = $form.find("select[name=facility]").val() || "";
         var cache = window.__ucbTmaLocCache;
         var cacheKey = String(facilityName);
