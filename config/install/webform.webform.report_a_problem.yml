@@ -21,6 +21,7 @@ elements: |-
     categories:
       '#type': webform_entity_radios
       '#title': 'Know Your Issue? '
+      '#required': true
       '#target_type': taxonomy_term
       '#selection_handler': 'default:taxonomy_term'
       '#selection_settings':
