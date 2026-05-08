@@ -51,7 +51,7 @@ elements: |-
     '#next_button_label': Next
     issue_type_wrapper:
       '#type': fieldset
-      '#title': 'Issue Type Wrapper'
+      '#title': 'Issue Summary'
       '#title_display': invisible
       '#attributes':
         class:
@@ -108,7 +108,7 @@ elements: |-
     '#next_button_label': Next
     location_and_contact_wrapper:
       '#type': fieldset
-      '#title': 'Location and Contact Wrapper'
+      '#title': 'Location & Contact Information'
       '#title_display': invisible
       '#attributes':
         class:
