@@ -95,17 +95,34 @@
         }
       }
 
-      function disableNext(disabled) {
-        var d = !!disabled;
-        var $forms = $(
-          "form[id^='webform-submission-report-a-problem'], form[id^='webform-submission-request-services']"
+      // Track the currently selected exception (if any).
+      // When set, we block Next/Preview/Submit and re-show the modal on click.
+      window.__ucbTmaActiveException = window.__ucbTmaActiveException || {
+        title: "",
+        msg: "",
+      };
+
+      function setActiveException(title, msg) {
+        window.__ucbTmaActiveException.title = (title || "").toString();
+        window.__ucbTmaActiveException.msg = (msg || "").toString();
+      }
+
+      function hasActiveException() {
+        return !!(window.__ucbTmaActiveException && window.__ucbTmaActiveException.msg);
+      }
+
+      function showActiveExceptionModal() {
+        if (!hasActiveException()) return;
+        ensureExceptionModal();
+        openExceptionModalHtml(
+          "<div class='exception-content'><h2>We're Sorry</h2>" +
+            escapeHtml(window.__ucbTmaActiveException.msg) +
+            "</div>" +
+            "<div class='button-wrap'>" +
+            "<a href='/' class='button' name='return_home'>Return Home</a>" +
+            "<a class='button' name='okay'>OK</a>" +
+            "</div>"
         );
-        $forms
-          .find(
-            "input.webform-button--next:visible, button.webform-button--next:visible, input.webform-button--preview:visible, button.webform-button--preview:visible"
-          )
-          .prop("disabled", d);
-        $forms.find("#edit-input-information-related-to-the-issue").prop("disabled", d);
       }
 
       $(
@@ -117,38 +134,45 @@
           var title = selectedIssueTitle(this);
           if (!title) {
             closeExceptionModal();
+            setActiveException("", "");
             return;
           }
 
           ensureExceptionMapLoaded(function (map) {
             var msg = map[title];
             if (msg) {
-              ensureExceptionModal();
-              openExceptionModalHtml(
-                "<div class='exception-content'><h2>We're Sorry</h2>" +
-                  escapeHtml(msg) +
-                  "</div>" +
-                  "<div class='button-wrap'>" +
-                  "<a href='/' class='button' name='return_home'>Return Home</a>" +
-                  "<a class='button' name='okay'>OK</a>" +
-                  "</div>"
-              );
-              disableNext(true);
+              setActiveException(title, msg);
+              showActiveExceptionModal();
             } else {
               closeExceptionModal();
-              disableNext(false);
+              setActiveException("", "");
             }
           });
         });
+
+      // If an exception is active, re-open the modal whenever they try
+      // to progress (Next/Preview/Submit).
+      $(
+        "form[id^='webform-submission-report-a-problem'], form[id^='webform-submission-request-services']",
+        context
+      )
+        .off("click.ucbTmaExceptionBlock")
+        .on(
+          "click.ucbTmaExceptionBlock",
+          "input.webform-button--next, button.webform-button--next, input.webform-button--preview, button.webform-button--preview, input.webform-button--submit, button.webform-button--submit",
+          function (e) {
+            if (!hasActiveException()) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            showActiveExceptionModal();
+          }
+        );
 
       // OK button inside webform context (rare) + document-level handler (modal is appended to body).
       $("a[name='okay']", context).off("click.ucbTmaExceptionOkay").on("click.ucbTmaExceptionOkay", function (e) {
         e.preventDefault();
         closeExceptionModal();
-        disableNext(false);
-        $(
-          "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]"
-        ).prop("checked", false);
+        // Keep progress disabled until a non-exception option is selected.
       });
 
       $(document)
@@ -156,10 +180,7 @@
         .on("click.ucbTmaExceptionOkay", "#ucb-tma-exception-modal a[name='okay']", function (e) {
           e.preventDefault();
           closeExceptionModal();
-          disableNext(false);
-          $(
-            "select[name=task_select], input[name=task_select], select[name=what_type_of_issue_would_you_like_to_report_], input[name=what_type_of_issue_would_you_like_to_report_]"
-          ).prop("checked", false);
+          // Keep progress disabled until a non-exception option is selected.
         });
     },
   };
