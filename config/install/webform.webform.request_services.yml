@@ -22,6 +22,7 @@ elements: |
       '#type': webform_entity_radios
       '#title': 'Need our assistance?'
       '#required': true
+      '#format': value
       '#target_type': taxonomy_term
       '#selection_handler': 'default:taxonomy_term'
       '#selection_settings':
