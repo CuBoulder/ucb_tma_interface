@@ -95,6 +95,7 @@
         $area.prop("selectedIndex", 0);
 
         var seen = {};
+        var rows = [];
         $.each(areas || [], function (_, entry) {
           if (!entry) return;
           if (String(entry.connector) !== String(buildingId)) return;
@@ -103,10 +104,17 @@
           if (seen[rawName]) return;
           seen[rawName] = true;
           var label = entry.description ? entry.name + ", " + entry.description : entry.name;
+          rows.push({
+            value: htmlDecode(rawName),
+            text: htmlDecode(label),
+          });
+        });
+        rows.sort(function (a, b) {
+          return a.text.localeCompare(b.text, undefined, { sensitivity: "base" });
+        });
+        $.each(rows, function (_, row) {
           $area.append(
-            $("<option></option>")
-              .attr("value", htmlDecode(entry.name))
-              .text(htmlDecode(label))
+            $("<option></option>").attr("value", row.value).text(row.text)
           );
         });
       }
