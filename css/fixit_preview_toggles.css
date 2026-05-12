@@ -1,0 +1,15 @@
+.webform-preview details > summary {
+  display: none;
+}
+
+.webform-preview details {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.webform-preview details[open] > *:not(summary),
+.webform-preview details:not([open]) > *:not(summary) {
+  display: block;
+}
+

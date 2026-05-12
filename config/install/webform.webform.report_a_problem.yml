@@ -21,6 +21,7 @@ elements: |-
     categories:
       '#type': webform_entity_radios
       '#title': 'Know Your Issue? '
+      '#required': true
       '#target_type': taxonomy_term
       '#selection_handler': 'default:taxonomy_term'
       '#selection_settings':
@@ -50,7 +51,7 @@ elements: |-
     '#next_button_label': Next
     issue_type_wrapper:
       '#type': fieldset
-      '#title': 'Issue Type Wrapper'
+      '#title': 'Issue Summary'
       '#title_display': invisible
       '#attributes':
         class:
@@ -60,12 +61,11 @@ elements: |-
         '#wrapper_attributes':
           class:
             - '[webform_submission:current-page]_cancel'
-        '#markup': '<a href="/node/3">Cancel</a>'
+        '#markup': '<a href="/">Cancel</a>'
       task_select:
-        '#type': webform_entity_select
+        '#type': webform_entity_radios
         '#title': 'Issue Type'
         '#required': true
-        '#empty_option': '- Select an issue type -'
         '#target_type': node
         '#selection_handler': views
         '#selection_settings':
@@ -107,7 +107,7 @@ elements: |-
     '#next_button_label': Next
     location_and_contact_wrapper:
       '#type': fieldset
-      '#title': 'Location and Contact Wrapper'
+      '#title': 'Location & Contact Information'
       '#title_display': invisible
       '#attributes':
         class:
@@ -117,10 +117,10 @@ elements: |-
         '#wrapper_attributes':
           class:
             - '[webform_submission:current-page]_cancel'
-        '#markup': '<a href="/node/3">Cancel</a>'
+        '#markup': '<a href="/">Cancel</a>'
       facility:
         '#type': select
-        '#title': Facility
+        '#title': Neighborhood
         '#options': tma_facilities
         '#required': true
       building:
@@ -135,7 +135,7 @@ elements: |-
               filled: true
       area:
         '#type': select
-        '#title': Area
+        '#title': Area / Room
         '#options':
           Placeholder: Placeholder
         '#required': true

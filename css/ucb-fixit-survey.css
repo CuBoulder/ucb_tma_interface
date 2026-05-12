@@ -1,8 +1,6 @@
 /* This fixes the conditional post-Fixit survey rendered on the two form pages on Fixit sites. */
 /* This block is placed via Block Layout, and will be nested after the existing form, which creates a bunch of containers */
-#block-boulder-base-survey.container,
-#block-boulder-base-survey > .container,
-#block-boulder-base-survey .container.mb-4 {
+#block-boulder-base-fixitsurvey.container {
   max-width: none;
   width: auto;
   padding-left: 0;

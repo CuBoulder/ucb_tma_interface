@@ -21,6 +21,7 @@ elements: |
     services:
       '#type': webform_entity_radios
       '#title': 'Need our assistance?'
+      '#required': true
       '#format': value
       '#target_type': taxonomy_term
       '#selection_handler': 'default:taxonomy_term'
@@ -51,7 +52,7 @@ elements: |
     '#next_button_label': Next
     service_type_wrapper:
       '#type': fieldset
-      '#title': 'Service Type Wrapper'
+      '#title': 'Issue Summary'
       '#title_display': invisible
       '#attributes':
         class:
@@ -61,12 +62,11 @@ elements: |
         '#wrapper_attributes':
           class:
             - '[webform_submission:current-page]_cancel'
-        '#markup': '<a href="/node/3">Cancel</a>'
+        '#markup': '<a href="/">Cancel</a>'
       task_select:
         '#type': webform_entity_radios
         '#title': 'Service Type: <strong>[webform_submission:values:services:entity:name]</strong>'
         '#required': true
-        '#format': value
         '#target_type': node
         '#selection_handler': views
         '#selection_settings':
@@ -108,7 +108,7 @@ elements: |
     '#next_button_label': Next
     location_and_contact_wrapper:
       '#type': fieldset
-      '#title': 'Location And Contact Wrapper'
+      '#title': 'Location & Contact Information'
       '#title_display': invisible
       '#attributes':
         class:
@@ -118,7 +118,7 @@ elements: |
         '#wrapper_attributes':
           class:
             - '[webform_submission:current-page]_cancel'
-        '#markup': '<a href="/node/3">Cancel</a>'
+        '#markup': '<a href="/">Cancel</a>'
       facility:
         '#type': select
         '#title': Facility
@@ -128,7 +128,7 @@ elements: |
         '#type': select
         '#title': Building
         '#options':
-          1: '1'
+          Placeholder: Placeholder
         '#required': true
         '#states':
           enabled:
@@ -138,7 +138,7 @@ elements: |
         '#type': select
         '#title': Area
         '#options':
-          1: '1'
+          Placeholder: Placeholder
         '#required': true
         '#states':
           enabled:
