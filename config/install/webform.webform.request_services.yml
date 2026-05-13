@@ -121,7 +121,7 @@ elements: |
         '#markup': '<a href="/">Cancel</a>'
       facility:
         '#type': select
-        '#title': Facility
+        '#title': Neighborhood
         '#options': tma_facilities
         '#required': true
       building:
@@ -136,7 +136,7 @@ elements: |
               filled: true
       area:
         '#type': select
-        '#title': Area
+        '#title': Area / Room
         '#options':
           Placeholder: Placeholder
         '#required': true
