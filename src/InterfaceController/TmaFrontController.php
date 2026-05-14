@@ -13,6 +13,7 @@ use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Drupal\Component\Serialization\Yaml;
+use Drupal\taxonomy\TermInterface;
 
 /**
  * Class TmaFrontController
@@ -64,6 +65,9 @@ class TmaFrontController {
             'payload' => $this->sanitizeForLog($payload),
         ]);
         $resp = $platform->postJson('/v2/WorkRequest', $payload);
+        if ($resp instanceof ResponseInterface) {
+            $this->patchWorkOrderNotifyMeAfterSuccessfulWorkRequest($platform, $resp);
+        }
         $resp = $this->maybeWrapWorkRequestResponseAsLegacyIlog($platform, $reqData, $payload, $resp);
         $this->debugLog('v7.after', $this->formatResponseForLog($resp));
         return $resp;
@@ -110,7 +114,11 @@ class TmaFrontController {
         // Prefer the computed floor we actually submitted to Platform.
         $floor = (string) ($payload['floorNumber'] ?? ($reqData['floor'] ?? ''));
         if (trim($floor) === '' && $areaLabel !== '') {
-            $floor = $this->lookupLegacyFloorByAreaName($areaLabel) ?? '';
+            $resolvedAreaId = $this->lookupTermTmaIdByName('area', 'field_tma_area_id', $areaLabel);
+            $floor = $this->getFloorFromAreaTaxonomy(
+                $areaLabel,
+                is_int($resolvedAreaId) && $resolvedAreaId > 0 ? $resolvedAreaId : NULL
+            );
         }
 
         $buildingName = '';
@@ -287,18 +295,16 @@ class TmaFrontController {
         $buildingCode = is_int($buildingId) ? $this->fetchBuildingCode($platform, $buildingId) : NULL;
 
         $roomNumber = NULL;
-        $areaFloorCode = NULL;
         $areaSubLocation = NULL;
         if (is_int($areaId)) {
             // For WorkRequest, "roomNumber" is the best available stand-in for legacy ILOG_AREA.
             // Prefer the Area's LocationCode (e.g. BRCKA-1101) over plain RoomNumber (e.g. 1101),
             // because this is what requestors/search commonly use in TMA.
-            $areaRec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $areaId . '?columns=RoomNumber,LocationCode,FloorCode,Description');
+            $areaRec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $areaId . '?columns=RoomNumber,LocationCode,Description');
             if (is_array($areaRec)) {
                 $loc = $this->stringFieldFromRecord($areaRec, ['LocationCode', 'locationCode']);
                 $rm = $this->stringFieldFromRecord($areaRec, ['RoomNumber', 'roomNumber']);
                 $roomNumber = ($loc !== NULL && $loc !== '') ? $loc : $rm;
-                $areaFloorCode = $this->stringFieldFromRecord($areaRec, ['FloorCode', 'floorCode']);
                 $areaSubLocation = $this->stringFieldFromRecord($areaRec, ['Description', 'description']);
             }
             if ($roomNumber === NULL || $roomNumber === '') {
@@ -338,6 +344,7 @@ class TmaFrontController {
             'areaName' => $areaName,
             'areaId' => $areaId,
             'roomNumber' => $roomNumber,
+            'notifyMe' => TRUE,
         ]);
 
         if ($facilityCode === NULL || $facilityCode === '' || $buildingCode === NULL || $buildingCode === '') {
@@ -354,6 +361,8 @@ class TmaFrontController {
             'requestorEmail' => $requestorEmail,
             'requestorName' => $requestorName,
             'requestorPhoneNumber' => $requestorPhone,
+            // WorkRequestCreate omits this in swagger; WorkOrder exposes notifyMe — we also PATCH WO after create.
+            'notifyMe' => TRUE,
         ];
         if ($taskCode !== '') {
             $payload['taskCode'] = $taskCode;
@@ -364,11 +373,9 @@ class TmaFrontController {
         if ($roomNumber !== NULL && $roomNumber !== '') {
             $payload['roomNumber'] = $roomNumber;
         }
-        // Prefer legacy-derived floor (Drupal taxonomy) for parity with v5 submissions.
-        // Platform Areas often have FloorCode/FloorId null (e.g. housing), so relying on Platform alone loses floor.
         $floor = trim((string) ($request['floor'] ?? ''));
         if ($floor === '' && $areaName !== '') {
-            $floor = $this->lookupLegacyFloorByAreaName($areaName) ?? '';
+            $floor = $this->getFloorFromAreaTaxonomy($areaName, is_int($areaId) ? $areaId : NULL);
         }
         $floorNumber = NULL;
         if ($floor !== '') {
@@ -396,38 +403,67 @@ class TmaFrontController {
     }
 
     /**
-     * Legacy parity: resolve floor code from the Drupal taxonomy term for the selected area.
+     * WorkRequest POST does not apply notifyMe in practice; set it on the created WorkOrder via PATCH.
      *
-     * The legacy webform handler stored the floor value on submit by looking up
-     * taxonomy_term__field_floor via the area's term name.
+     * @see https://webtma.com/platformapi — PATCH /v2/WorkOrders/{id} partial update.
      */
-    private function lookupLegacyFloorByAreaName(string $areaName): ?string {
-        $areaName = trim($areaName);
-        if ($areaName === '') {
-            return NULL;
+    private function patchWorkOrderNotifyMeAfterSuccessfulWorkRequest(PlatformConnector $platform, ResponseInterface $resp): void {
+        $raw = $this->readResponseBodyWithoutConsuming($resp);
+        $decoded = json_decode($raw, TRUE);
+        if (!is_array($decoded)) {
+            return;
         }
-        try {
-            $query = \Drupal::database()->select('taxonomy_term_field_data', 'd');
-            $query->leftJoin('taxonomy_term__field_floor', 'f', 'd.tid = f.entity_id');
-            $query->addField('f', 'field_floor_value');
-            $query->condition('d.name', $areaName);
-            // Ensure we only match the Area vocabulary (names may be duplicated across vocabs).
-            $query->condition('d.vid', 'area');
-            $query->range(0, 1);
-            $val = $query->execute()->fetchField();
-            $s = is_string($val) ? trim($val) : (is_numeric($val) ? (string) $val : '');
-            $out = $s !== '' ? $s : NULL;
-            if ($this->debugEnabled()) {
-                $this->debugLog('v7.floor_lookup', [
-                    'areaName' => $areaName,
-                    'result' => $out,
-                ]);
+        $success = $decoded['Success'] ?? $decoded['success'] ?? NULL;
+        if ($success !== TRUE) {
+            return;
+        }
+        $woNumber = trim((string) ($decoded['TMAWorkOrderNumber'] ?? $decoded['tmaWorkOrderNumber'] ?? ''));
+        if ($woNumber === '') {
+            return;
+        }
+        $escaped = str_replace("'", "''", $woNumber);
+        $filterVariants = [
+            "Number eq '" . $escaped . "'",
+            "number eq '" . $escaped . "'",
+            "tolower(Number) eq '" . strtolower($escaped) . "'",
+            "tolower(number) eq '" . strtolower($escaped) . "'",
+        ];
+        foreach ($filterVariants as $expr) {
+            $filter = rawurlencode($expr);
+            $listResp = $platform->get('/v2/WorkOrders?filter=' . $filter . '&pageSize=1&columns=Id,Number');
+            $rows = $this->decodePlatformListRows($listResp);
+            $first = is_array($rows[0] ?? NULL) ? $rows[0] : NULL;
+            $id = is_array($first) ? ($first['Id'] ?? $first['id'] ?? NULL) : NULL;
+            if (!is_numeric($id) || (int) $id <= 0) {
+                continue;
             }
-            return $out;
+            $patchResp = $platform->patchJson('/v2/WorkOrders/' . (int) $id, [
+                'notifyMe' => TRUE,
+            ]);
+            if ($patchResp instanceof ResponseInterface) {
+                $ps = $patchResp->getStatusCode();
+                if ($ps >= 200 && $ps < 300) {
+                    $this->debugLog('v7.notify_me_patch', [
+                        'workOrderId' => (int) $id,
+                        'number' => $woNumber,
+                        'status' => $ps,
+                    ]);
+                }
+                else {
+                    $this->debugLog('v7.notify_me_patch_error', [
+                        'workOrderId' => (int) $id,
+                        'number' => $woNumber,
+                        'status' => $ps,
+                        'body' => $this->sanitizeForLog($this->truncate($this->readResponseBodyWithoutConsuming($patchResp), 1500)),
+                    ]);
+                }
+            }
+            return;
         }
-        catch (\Throwable) {
-            return NULL;
-        }
+        $this->debugLog('v7.notify_me_patch_skipped', [
+            'number' => $woNumber,
+            'reason' => 'work_order_id_not_found',
+        ]);
     }
 
     /**
@@ -481,6 +517,89 @@ class TmaFrontController {
             'TMARequestNumber' => NULL,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return new Response(400, ['Content-Type' => 'application/json'], $body ?: '{}');
+    }
+
+    /**
+     * Floor string from the area vocabulary term's field_floor (entity API only).
+     *
+     * @param string $areaSubmitted
+     *   Webform `area` value (usually LocationCode / term name, or numeric taxonomy tid).
+     * @param int|null $platformAreaId
+     *   Platform area id stored on the term as field_tma_area_id, when already resolved.
+     */
+    public function getFloorFromAreaTaxonomy(string $areaSubmitted, ?int $platformAreaId = NULL): string {
+        $areaSubmitted = trim($areaSubmitted);
+        try {
+            $storage = \Drupal::entityTypeManager()->getStorage('taxonomy_term');
+        }
+        catch (\Throwable) {
+            return '';
+        }
+
+        $readFloor = static function ($term): string {
+            if (!$term instanceof TermInterface || $term->bundle() !== 'area') {
+                return '';
+            }
+            $base = method_exists($term, 'getUntranslated') ? $term->getUntranslated() : $term;
+            if (!$base->hasField('field_floor') || $base->get('field_floor')->isEmpty()) {
+                return '';
+            }
+            $v = $base->get('field_floor')->value;
+            if (is_string($v)) {
+                return trim($v);
+            }
+            if (is_int($v) || is_float($v)) {
+                return trim((string) $v);
+            }
+            return '';
+        };
+
+        try {
+            if ($areaSubmitted !== '' && ctype_digit($areaSubmitted)) {
+                $term = $storage->load((int) $areaSubmitted);
+                if ($term) {
+                    $hit = $readFloor($term);
+                    if ($hit !== '') {
+                        return $hit;
+                    }
+                }
+            }
+            if ($areaSubmitted !== '') {
+                $tids = $storage->getQuery()
+                    ->accessCheck(FALSE)
+                    ->condition('vid', 'area')
+                    ->condition('name', $areaSubmitted)
+                    ->range(0, 1)
+                    ->execute();
+                if ($tids) {
+                    $term = $storage->load((int) reset($tids));
+                    $hit = $readFloor($term);
+                    if ($hit !== '') {
+                        return $hit;
+                    }
+                }
+            }
+            if (is_int($platformAreaId) && $platformAreaId > 0) {
+                $tids = $storage->getQuery()
+                    ->accessCheck(FALSE)
+                    ->condition('vid', 'area')
+                    ->condition('field_tma_area_id', $platformAreaId)
+                    ->range(0, 1)
+                    ->execute();
+                if ($tids) {
+                    $term = $storage->load((int) reset($tids));
+                    $hit = $readFloor($term);
+                    if ($hit !== '') {
+                        return $hit;
+                    }
+                }
+            }
+        }
+        catch (\Throwable) {
+            return '';
+        }
+
+        return '';
     }
 
     /**

@@ -37,6 +37,14 @@ final class PlatformConnector {
   }
 
   /**
+   * @param array<string, mixed>|list<mixed> $json
+   * @return array|\Psr\Http\Message\ResponseInterface
+   */
+  public function patchJson(string $relativePathWithQuery, array $json): array|ResponseInterface {
+    return $this->request('PATCH', $relativePathWithQuery, $json);
+  }
+
+  /**
    * @param array<string, mixed>|list<mixed>|null $json
    * @return array|\Psr\Http\Message\ResponseInterface
    */

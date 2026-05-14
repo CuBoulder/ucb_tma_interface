@@ -61,24 +61,8 @@ class TmaFormHandler extends WebformHandlerBase {
         $webform_submission->setElementData('repair_center', '');
       }
 
-      // Add floor code to submission results.
-      $area = $webform_submission->getElementData('area');
-      $area_query = \Drupal::database()->select('taxonomy_term_field_data', 'd');
-      $area_query->leftJoin('taxonomy_term__field_floor', 'f', 'd.tid = f.entity_id');
-      $area_query->addField('f', 'field_floor_value');
-      $area_query->condition('d.name', $area);
-      $area_results = $area_query->execute()->fetchAll(\PDO::FETCH_OBJ);
-      if (count($area_results)) {
-        if ($area_results[0]->field_floor_value) {
-          $webform_submission->setElementData('floor', $area_results[0]->field_floor_value);
-        }
-        else {
-          $webform_submission->setElementData('floor', '');
-        }
-      }
-      else {
-        $webform_submission->setElementData('floor', '');
-      }
+      $area = (string) $webform_submission->getElementData('area');
+      $webform_submission->setElementData('floor', $tmaFrontController->getFloorFromAreaTaxonomy($area, NULL));
       $building = $webform_submission->getElementData('building');
       if ($building == 'Faculty Staff Court') {
         $webform_submission->setElementData('building', 'Faculty/Staff Court');
