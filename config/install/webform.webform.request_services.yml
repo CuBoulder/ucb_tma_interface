@@ -311,7 +311,7 @@ settings:
   confirmation_type: page
   confirmation_url: ''
   confirmation_title: 'Submission Complete'
-  confirmation_message: "<span>Thank you!</span>\r\n<p><strong>You&#39;ve completed your TMA FixIt Request</strong></p>\r\n\r\n<p>Ticket #<strong>[webform_submission:values:ticket_id]</strong> has been submitted. We will keep you updated with the progress.</p>"
+  confirmation_message: "<span>Thank you!</span>\r\n<p><strong>You&#39;ve completed your TMA FixIt Request</strong></p>\r\n\r\n<p>Request #<strong>[webform_submission:values:ticket_id]</strong> has been submitted. We will keep you updated with the progress.</p>"
   confirmation_attributes: {  }
   confirmation_back: false
   confirmation_back_label: ''
