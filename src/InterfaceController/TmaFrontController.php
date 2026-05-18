@@ -66,6 +66,7 @@ class TmaFrontController {
         ]);
         $resp = $platform->postJson('/v2/WorkRequest', $payload);
         if ($resp instanceof ResponseInterface) {
+            $this->patchRequestLogAfterSuccessfulWorkRequest($platform, $resp, $reqData, $payload);
             $this->patchWorkOrderNotifyMeAfterSuccessfulWorkRequest($platform, $resp);
         }
         $resp = $this->maybeWrapWorkRequestResponseAsLegacyIlog($platform, $reqData, $payload, $resp);
@@ -107,15 +108,15 @@ class TmaFrontController {
         $requestorName = (string) ($contact['name'] ?? '');
         $requestorEmail = (string) ($contact['email'] ?? '');
         $requestorPhone = (string) ($contact['phone'] ?? '');
-        $actionRequested = (string) ($reqData['input_information_related_to_the_issue'] ?? '');
+        $actionRequested = $this->issueDescriptionForWorkRequest((string) ($reqData['input_information_related_to_the_issue'] ?? ''));
 
         $facilityLabel = (string) ($reqData['facility'] ?? '');
         $areaLabel = (string) ($reqData['area'] ?? '');
-        // Prefer the computed floor we actually submitted to Platform.
-        $floor = (string) ($payload['floorNumber'] ?? ($reqData['floor'] ?? ''));
-        if (trim($floor) === '' && $areaLabel !== '') {
-            $resolvedAreaId = $this->lookupTermTmaIdByName('area', 'field_tma_area_id', $areaLabel);
-            $floor = $this->getFloorFromAreaTaxonomy(
+        $resolvedAreaId = $areaLabel !== '' ? $this->lookupTermTmaIdByName('area', 'field_tma_area_id', $areaLabel) : NULL;
+        $floor = trim((string) ($payload['floorNumber'] ?? ''));
+        if ($floor === '') {
+            $floor = $this->resolveWorkRequestFloorNumber(
+                $reqData,
                 $areaLabel,
                 is_int($resolvedAreaId) && $resolvedAreaId > 0 ? $resolvedAreaId : NULL
             );
@@ -150,8 +151,8 @@ class TmaFrontController {
                 'i_WebTMA_Requests' => [
                     [
                         'ILOG_PK' => '',
-                        // Prefer work order number when present; fall back to request number.
-                        'ILOG_NUMBER' => (string) (($woNumber !== '') ? $woNumber : $requestNumber),
+                        // Confirmation / ticket_id: request number for end users; work order if no request id.
+                        'ILOG_NUMBER' => (string) (($requestNumber !== '') ? $requestNumber : $woNumber),
                         'ILOG_REQUESTOR' => (string) $requestorName,
                         'ILOG_REQ_DATE' => (string) $reqDate,
                         'ILOG_REQ_PHONE' => (string) $requestorPhone,
@@ -273,7 +274,7 @@ class TmaFrontController {
         $requestorName = trim((string) ($contact['name'] ?? ''));
         $requestorEmail = trim((string) ($contact['email'] ?? ''));
         $requestorPhone = trim((string) ($contact['phone'] ?? ''));
-        $actionRequested = trim((string) ($request['input_information_related_to_the_issue'] ?? ''));
+        $actionRequested = $this->issueDescriptionForWorkRequest(trim((string) ($request['input_information_related_to_the_issue'] ?? '')));
 
         $taskCode = trim((string) ($request['task_select'] ?? ''));
         $repairCenterField = trim((string) ($request['repair_center'] ?? ''));
@@ -293,48 +294,28 @@ class TmaFrontController {
 
         $facilityCode = is_int($facilityTmaId) ? $this->fetchFacilityCode($platform, $facilityTmaId) : NULL;
         $buildingCode = is_int($buildingId) ? $this->fetchBuildingCode($platform, $buildingId) : NULL;
+        $facilityPlatformName = is_int($facilityTmaId) ? $this->fetchFacilityDisplayName($platform, $facilityTmaId) : NULL;
+        $buildingPlatformName = is_int($buildingId) ? $this->fetchBuildingDisplayName($platform, $buildingId) : NULL;
 
-        $roomNumber = NULL;
-        $areaSubLocation = NULL;
-        if (is_int($areaId)) {
-            // For WorkRequest, "roomNumber" is the best available stand-in for legacy ILOG_AREA.
-            // Prefer the Area's LocationCode (e.g. BRCKA-1101) over plain RoomNumber (e.g. 1101),
-            // because this is what requestors/search commonly use in TMA.
-            $areaRec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $areaId . '?columns=RoomNumber,LocationCode,Description');
-            if (is_array($areaRec)) {
-                $loc = $this->stringFieldFromRecord($areaRec, ['LocationCode', 'locationCode']);
-                $rm = $this->stringFieldFromRecord($areaRec, ['RoomNumber', 'roomNumber']);
-                $roomNumber = ($loc !== NULL && $loc !== '') ? $loc : $rm;
-                $areaSubLocation = $this->stringFieldFromRecord($areaRec, ['Description', 'description']);
-            }
-            if ($roomNumber === NULL || $roomNumber === '') {
-                // Fallback to whatever label came from the webform.
-                $roomNumber = $areaName;
-            }
-        }
-
-        $repairCenterCode = $repairCenterField !== '' ? $repairCenterField : NULL;
-        if ($repairCenterCode === NULL) {
-            $task = $taskCode !== '' ? $this->lookupTaskByCode($platform, $taskCode) : NULL;
-            $repairCenterId = is_array($task) ? $this->extractTaskRepairCenterId($task) : NULL;
-            if (!is_int($repairCenterId) && is_int($areaId)) {
-                $repairCenterId = $this->lookupAreaRepairCenterId($platform, $areaId);
-            }
-            if (is_int($repairCenterId)) {
-                $repairCenterCode = $this->fetchRepairCenterCode($platform, $repairCenterId);
-            }
-        }
+        $repairCenter = $this->resolveRepairCenterForWorkRequest($platform, $request, $taskCode);
+        $repairCenterCode = $repairCenter['code'] ?? NULL;
+        $repairCenterName = $repairCenter['name'] ?? NULL;
 
         $requestTypeCode = trim((string) ($this->config->get('platform_request_type_code') ?: 'WEB'));
         if ($requestTypeCode === '') {
             $requestTypeCode = 'WEB';
         }
 
+        $floorStr = $this->resolveWorkRequestFloorNumber($request, $areaName, is_int($areaId) ? $areaId : NULL);
+        $roomNumber = $this->resolveWorkRequestRoomNumber($platform, $areaName, is_int($areaId) ? $areaId : NULL);
+        $subLocationResolved = $this->resolveWorkRequestSubLocation($platform, is_int($areaId) ? $areaId : NULL);
+
         $this->debugLog('v7.resolved_ids', [
             'taskCode' => $taskCode,
             'requestTypeCode' => $requestTypeCode,
             'repairCenterField' => $repairCenterField,
             'repairCenterCode' => $repairCenterCode,
+            'repairCenterName' => $repairCenterName,
             'facilityName' => $facilityName,
             'facilityTmaId' => $facilityTmaId,
             'facilityCode' => $facilityCode,
@@ -343,7 +324,11 @@ class TmaFrontController {
             'buildingCode' => $buildingCode,
             'areaName' => $areaName,
             'areaId' => $areaId,
-            'roomNumber' => $roomNumber,
+            'workRequestFloorNumber' => $floorStr,
+            'workRequestRoomNumber' => $roomNumber,
+            'facilityPlatformName' => $facilityPlatformName,
+            'buildingPlatformName' => $buildingPlatformName,
+            'workRequestSubLocation' => $subLocationResolved,
             'notifyMe' => TRUE,
         ]);
 
@@ -370,40 +355,225 @@ class TmaFrontController {
         if ($repairCenterCode !== NULL && $repairCenterCode !== '') {
             $payload['repairCenterCode'] = $repairCenterCode;
         }
-        if ($roomNumber !== NULL && $roomNumber !== '') {
+        if (is_string($repairCenterName) && $repairCenterName !== '') {
+            $payload['repairCenterName'] = $repairCenterName;
+        }
+        if ($floorStr !== '') {
+            $payload['floorNumber'] = $floorStr;
+        }
+        if ($roomNumber !== '') {
             $payload['roomNumber'] = $roomNumber;
         }
-        $floor = trim((string) ($request['floor'] ?? ''));
-        if ($floor === '' && $areaName !== '') {
-            $floor = $this->getFloorFromAreaTaxonomy($areaName, is_int($areaId) ? $areaId : NULL);
+        if (is_string($facilityPlatformName) && $facilityPlatformName !== '') {
+            $payload['facilityName'] = $facilityPlatformName;
         }
-        $floorNumber = NULL;
-        if ($floor !== '') {
-            $floorNumber = $floor;
+        if (is_string($buildingPlatformName) && $buildingPlatformName !== '') {
+            $payload['buildingName'] = $buildingPlatformName;
         }
-        if ($floorNumber !== NULL && $floorNumber !== '') {
-            $payload['floorNumber'] = $floorNumber;
-        }
-        // Best-effort: carry area description as subLocation (helps match legacy "area" semantics in v7).
-        if (is_string($areaSubLocation) && trim($areaSubLocation) !== '') {
-            $payload['subLocation'] = trim($areaSubLocation);
-        }
-        $extra = [];
-        if ($requestorName !== '') {
-            $extra[] = 'Requestor: ' . $requestorName;
-        }
-        if ($requestorPhone !== '') {
-            $extra[] = 'Phone: ' . $requestorPhone;
-        }
-        if ($extra !== []) {
-            $payload['comments'] = implode(' | ', $extra);
+        if ($subLocationResolved !== '') {
+            $payload['subLocation'] = $subLocationResolved;
         }
 
         return $payload;
     }
 
     /**
-     * WorkRequest POST does not apply notifyMe in practice; set it on the created WorkOrder via PATCH.
+     * Free-text issue only for WorkRequest.actionRequested / legacy ILOG_REQUEST.
+     *
+     * Strips TMA / webform template tails (labeled empty fields) that are not meant to live
+     * inside the issue body — those belong in separate API keys when we send them.
+     */
+    private function issueDescriptionForWorkRequest(string $raw): string {
+        $s = trim(str_replace(["\r\n", "\r"], "\n", $raw));
+        if ($s === '') {
+            return '';
+        }
+        // Rare: textarea stored HTML breaks instead of newlines.
+        $s = preg_replace('#<br\s*/?>#i', "\n", $s) ?? $s;
+        if (preg_match('/<(?:br|p|div)\b/i', $s)) {
+            $s = html_entity_decode(strip_tags($s), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $s = trim(str_replace(["\r\n", "\r"], "\n", $s));
+        }
+        // Labeled template block (RepairCenter / Department / RoomNumber / …) is not part of the issue body.
+        if (preg_match('/\R[ \t\x{00A0}]*(?:RepairCenter|Department)\s*:/u', $s, $m, PREG_OFFSET_CAPTURE)) {
+            $s = trim(substr($s, 0, $m[0][1]));
+        }
+        $labels = 'RepairCenter|Department|EquipmentTagNumber|EquipmentDescription|RoomNumber|DueDate|SubLocation|RecommendedAction|Account';
+        $s = preg_replace('/^[ \t\x{00A0}]*(?:' . $labels . ')\s*:.*$/mu', '', $s) ?? $s;
+        $s = preg_replace('/^[ \t\x{00A0}]*Requestor\s*:.*$/mu', '', $s) ?? $s;
+        $s = preg_replace('/^[ \t\x{00A0}]*Phone\s*:.*$/mu', '', $s) ?? $s;
+        $s = preg_replace("/\n{3,}/u", "\n\n", $s);
+        return trim($s);
+    }
+
+    /**
+     * WorkRequest POST maps loosely to RequestLog; PATCH /v2/Requests/{id} for UI fields (swagger RequestLog).
+     *
+     * Request Information uses floorCode, areaRoomNumber, notifyMe — not only WorkRequestCreate keys.
+     *
+     * @param array<string, mixed> $reqData
+     * @param array<string, mixed> $workRequestPayload
+     */
+    private function patchRequestLogAfterSuccessfulWorkRequest(PlatformConnector $platform, ResponseInterface $resp, array $reqData, array $workRequestPayload): void {
+        $raw = $this->readResponseBodyWithoutConsuming($resp);
+        $decoded = json_decode($raw, TRUE);
+        if (!is_array($decoded)) {
+            return;
+        }
+        $success = $decoded['Success'] ?? $decoded['success'] ?? NULL;
+        if ($success !== TRUE) {
+            return;
+        }
+        $requestNumber = trim((string) ($decoded['TMARequestNumber'] ?? $decoded['tmaRequestNumber'] ?? ''));
+        if ($requestNumber === '') {
+            $this->debugLog('v7.request_log_patch_skipped', ['reason' => 'no_request_number']);
+            return;
+        }
+        $requestLogId = $this->lookupRequestLogIdByNumber($platform, $requestNumber, 3);
+        if (!is_int($requestLogId) || $requestLogId <= 0) {
+            $this->debugLog('v7.request_log_patch_skipped', [
+                'requestNumber' => $requestNumber,
+                'reason' => 'request_log_id_not_found',
+            ]);
+            return;
+        }
+
+        $areaName = trim((string) ($reqData['area'] ?? ''));
+        $areaId = $areaName !== '' ? $this->lookupTermTmaIdByName('area', 'field_tma_area_id', $areaName) : NULL;
+        $buildingRaw = trim((string) ($reqData['building'] ?? ''));
+        $buildingId = is_numeric($buildingRaw) ? (int) $buildingRaw : NULL;
+        if (!is_int($buildingId) && $buildingRaw !== '') {
+            $buildingId = $this->lookupTermTmaIdByName('building', 'field_tma_building_id_', $buildingRaw);
+        }
+        $facilityName = trim((string) ($reqData['facility'] ?? ''));
+        $facilityTmaId = $facilityName !== '' ? $this->lookupTermTmaIdByName('facility', 'field_tma_facility_id', $facilityName) : NULL;
+
+        $floorCode = $this->resolveWorkRequestFloorNumber(
+            $reqData,
+            $areaName,
+            is_int($areaId) && $areaId > 0 ? $areaId : NULL
+        );
+        if ($floorCode === '') {
+            $floorCode = trim((string) ($workRequestPayload['floorNumber'] ?? ''));
+        }
+        $areaRoom = $this->resolveWorkRequestRoomNumber(
+            $platform,
+            $areaName,
+            is_int($areaId) && $areaId > 0 ? $areaId : NULL
+        );
+        if ($areaRoom === '') {
+            $areaRoom = trim((string) ($workRequestPayload['roomNumber'] ?? ''));
+        }
+        $taskCode = trim((string) ($reqData['task_select'] ?? ''));
+        $repairCenter = $this->resolveRepairCenterForWorkRequest($platform, $reqData, $taskCode);
+        $actionRequested = trim((string) ($workRequestPayload['actionRequested'] ?? ''));
+        if ($actionRequested === '') {
+            $actionRequested = $this->issueDescriptionForWorkRequest(
+                trim((string) ($reqData['input_information_related_to_the_issue'] ?? ''))
+            );
+        }
+
+        // PATCH /v2/Requests uses PascalCase property names (see swagger PUT/PATCH samples).
+        $patch = [
+            'NotifyMe' => TRUE,
+        ];
+        if ($actionRequested !== '') {
+            $patch['ActionRequested'] = $actionRequested;
+        }
+        if ($floorCode !== '') {
+            $patch['FloorCode'] = $floorCode;
+        }
+        if ($areaRoom !== '') {
+            $patch['AreaRoomNumber'] = $areaRoom;
+            $patch['AreaLocationCode'] = $areaRoom;
+        }
+        if (is_int($facilityTmaId) && $facilityTmaId > 0) {
+            $patch['FacilityId'] = $facilityTmaId;
+        }
+        if (is_int($buildingId) && $buildingId > 0) {
+            $patch['BuildingId'] = $buildingId;
+        }
+        if (is_int($areaId) && $areaId > 0) {
+            $patch['AreaId'] = $areaId;
+            $floorId = $this->lookupPlatformFloorIdForArea($platform, $areaId);
+            if (is_int($floorId) && $floorId > 0) {
+                $patch['FloorId'] = $floorId;
+            }
+        }
+        $rcCode = $repairCenter['code'] ?? NULL;
+        if (is_string($rcCode) && $rcCode !== '') {
+            $patch['RepairCenterCode'] = $rcCode;
+            $rcName = $repairCenter['name'] ?? NULL;
+            if (is_string($rcName) && $rcName !== '') {
+                $patch['RepairCenterName'] = $rcName;
+            }
+        }
+
+        $patchResp = $platform->patchJson('/v2/Requests/' . $requestLogId, $patch);
+        if ($patchResp instanceof ResponseInterface) {
+            $ps = $patchResp->getStatusCode();
+            if ($ps >= 200 && $ps < 300) {
+                $this->debugLog('v7.request_log_patch', [
+                    'requestLogId' => $requestLogId,
+                    'requestNumber' => $requestNumber,
+                    'status' => $ps,
+                    'patch' => $this->sanitizeForLog($patch),
+                ]);
+            }
+            else {
+                $this->debugLog('v7.request_log_patch_error', [
+                    'requestLogId' => $requestLogId,
+                    'requestNumber' => $requestNumber,
+                    'status' => $ps,
+                    'body' => $this->sanitizeForLog($this->truncate($this->readResponseBodyWithoutConsuming($patchResp), 1500)),
+                ]);
+            }
+        }
+    }
+
+    private function lookupRequestLogIdByNumber(PlatformConnector $platform, string $requestNumber, int $attempts = 1): ?int {
+        $requestNumber = trim($requestNumber);
+        if ($requestNumber === '') {
+            return NULL;
+        }
+        $escaped = str_replace("'", "''", $requestNumber);
+        $filters = [
+            "Number eq '" . $escaped . "'",
+            "number eq '" . $escaped . "'",
+        ];
+        if (ctype_digit($requestNumber)) {
+            $filters[] = 'Number eq ' . (int) $requestNumber;
+            $filters[] = 'number eq ' . (int) $requestNumber;
+        }
+        $attempts = max(1, $attempts);
+        for ($try = 0; $try < $attempts; $try++) {
+            foreach ($filters as $expr) {
+                $listResp = $platform->get('/v2/Requests?filter=' . rawurlencode($expr) . '&pageSize=1&columns=Id,Number');
+                $rows = $this->decodePlatformListRows($listResp);
+                $first = is_array($rows[0] ?? NULL) ? $rows[0] : NULL;
+                $id = is_array($first) ? ($first['Id'] ?? $first['id'] ?? NULL) : NULL;
+                if (is_numeric($id) && (int) $id > 0) {
+                    return (int) $id;
+                }
+            }
+            if ($try + 1 < $attempts) {
+                usleep(300000);
+            }
+        }
+        return NULL;
+    }
+
+    private function lookupPlatformFloorIdForArea(PlatformConnector $platform, int $platformAreaId): ?int {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/Areas/' . $platformAreaId . '?columns=FloorId,floorId');
+        if (!is_array($rec)) {
+            return NULL;
+        }
+        $fid = $rec['FloorId'] ?? $rec['floorId'] ?? NULL;
+        return is_numeric($fid) && (int) $fid > 0 ? (int) $fid : NULL;
+    }
+
+    /**
+     * WorkRequest POST does not apply notifyMe on RequestLog; also set on WorkOrder when one exists.
      *
      * @see https://webtma.com/platformapi — PATCH /v2/WorkOrders/{id} partial update.
      */
@@ -438,7 +608,7 @@ class TmaFrontController {
                 continue;
             }
             $patchResp = $platform->patchJson('/v2/WorkOrders/' . (int) $id, [
-                'notifyMe' => TRUE,
+                'NotifyMe' => TRUE,
             ]);
             if ($patchResp instanceof ResponseInterface) {
                 $ps = $patchResp->getStatusCode();
@@ -494,9 +664,50 @@ class TmaFrontController {
         return NULL;
     }
 
+    /**
+     * @param list<string> $keys
+     */
+    private function scalarStringFromRecord(?array $record, array $keys): ?string {
+        if (!is_array($record)) {
+            return NULL;
+        }
+        foreach ($keys as $key) {
+            $v = $record[$key] ?? NULL;
+            if (is_string($v) && trim($v) !== '') {
+                return trim($v);
+            }
+            if (is_int($v) || is_float($v)) {
+                return trim((string) $v);
+            }
+        }
+        return NULL;
+    }
+
+    /**
+     * Normalize Platform location codes embedded in descriptions (e.g. BRKT-BRKT-02 → BRKT-02).
+     *
+     * Not used for WorkRequest.floorNumber; that value comes from taxonomy `field_floor` (already
+     * normalized when areas are imported in TmaLocationFeedPayloadBuilder).
+     */
+    private function normalizeDoublePrefixedLocationCode(string $code): string {
+        $code = trim($code);
+        if ($code === '') {
+            return '';
+        }
+        if (preg_match('/^([A-Za-z0-9]+)-\\1-(.+)$/', $code, $m)) {
+            return $m[1] . '-' . $m[2];
+        }
+        return $code;
+    }
+
     private function fetchFacilityCode(PlatformConnector $platform, int $facilityId): ?string {
         $rec = $this->fetchPlatformEntity($platform, '/v2/Facilities/' . $facilityId . '?columns=Code');
         return $this->stringFieldFromRecord($rec, ['Code', 'code']);
+    }
+
+    private function fetchFacilityDisplayName(PlatformConnector $platform, int $facilityId): ?string {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/Facilities/' . $facilityId . '?columns=Name');
+        return $this->stringFieldFromRecord($rec, ['Name', 'name']);
     }
 
     private function fetchBuildingCode(PlatformConnector $platform, int $buildingId): ?string {
@@ -504,9 +715,81 @@ class TmaFrontController {
         return $this->stringFieldFromRecord($rec, ['Code', 'code']);
     }
 
-    private function fetchRepairCenterCode(PlatformConnector $platform, int $repairCenterId): ?string {
-        $rec = $this->fetchPlatformEntity($platform, '/v2/RepairCenters/' . $repairCenterId . '?columns=Code');
-        return $this->stringFieldFromRecord($rec, ['Code', 'code']);
+    private function fetchBuildingDisplayName(PlatformConnector $platform, int $buildingId): ?string {
+        $rec = $this->fetchPlatformEntity($platform, '/v2/Buildings/' . $buildingId . '?columns=Name');
+        return $this->stringFieldFromRecord($rec, ['Name', 'name']);
+    }
+
+    /**
+     * Repair center for WorkRequest when task field_repair_center is true (fixit_tasks.yml via seeder).
+     *
+     * @param array<string, mixed> $request
+     *
+     * @return array{code: string, name: string|null}
+     */
+    private function resolveRepairCenterForWorkRequest(PlatformConnector $platform, array $request, string $taskCode): array {
+        $code = trim((string) ($request['repair_center'] ?? ''));
+        if ($code === '' && $taskCode !== '' && $this->taskRepairCenterEnabledFromTaskCode($taskCode)) {
+            $code = 'FS';
+        }
+        if ($code === '') {
+            return [];
+        }
+        return [
+            'code' => $code,
+            'name' => $this->fetchRepairCenterDisplayName($platform, $code),
+        ];
+    }
+
+    /**
+     * Whether the Fix It task node has field_repair_center set (from fixit_tasks.yml repair_center).
+     */
+    private function taskRepairCenterEnabledFromTaskCode(string $taskCode): bool {
+        $taskCode = trim($taskCode);
+        if ($taskCode === '') {
+            return FALSE;
+        }
+        try {
+            $nids = \Drupal::entityTypeManager()->getStorage('node')->getQuery()
+                ->accessCheck(FALSE)
+                ->condition('type', 'task')
+                ->condition('field_task_code', $taskCode)
+                ->range(0, 1)
+                ->execute();
+            if (!$nids) {
+                return FALSE;
+            }
+            $node = \Drupal::entityTypeManager()->getStorage('node')->load((int) reset($nids));
+            if (!$node || !$node->hasField('field_repair_center') || $node->get('field_repair_center')->isEmpty()) {
+                return FALSE;
+            }
+            return (bool) $node->get('field_repair_center')->value;
+        }
+        catch (\Throwable) {
+            return FALSE;
+        }
+    }
+
+    private function fetchRepairCenterDisplayName(PlatformConnector $platform, string $code): ?string {
+        $code = trim($code);
+        if ($code === '') {
+            return NULL;
+        }
+        $escaped = str_replace("'", "''", $code);
+        $filters = [
+            "Code eq '" . $escaped . "'",
+            "tolower(Code) eq '" . strtolower($escaped) . "'",
+        ];
+        foreach ($filters as $expr) {
+            $listResp = $platform->get('/v2/RepairCenters?filter=' . rawurlencode($expr) . '&pageSize=1&columns=Name,Code');
+            $rows = $this->decodePlatformListRows($listResp);
+            $first = is_array($rows[0] ?? NULL) ? $rows[0] : NULL;
+            $name = $this->stringFieldFromRecord($first, ['Name', 'name']);
+            if ($name !== NULL && $name !== '') {
+                return $name;
+            }
+        }
+        return NULL;
     }
 
     private function buildPlatformSubmissionErrorResponse(string $message): ResponseInterface {
@@ -603,6 +886,95 @@ class TmaFrontController {
     }
 
     /**
+     * Floor code for WorkRequest.floorNumber / TMA Floor Code: area term field_floor (fixit_tasks feed).
+     *
+     * @param array<string, mixed> $request
+     */
+    private function resolveWorkRequestFloorNumber(array $request, string $areaName, ?int $platformAreaId): string {
+        $platformAreaId = is_int($platformAreaId) && $platformAreaId > 0 ? $platformAreaId : NULL;
+        if ($areaName !== '' || $platformAreaId !== NULL) {
+            $fromTaxonomy = $this->getFloorFromAreaTaxonomy($areaName, $platformAreaId);
+            if ($fromTaxonomy !== '') {
+                return $fromTaxonomy;
+            }
+        }
+        return trim((string) ($request['floor'] ?? ''));
+    }
+
+    /**
+     * Area # for WorkRequest.roomNumber: area term name (LocationCode), else Platform Area fields.
+     */
+    private function resolveWorkRequestRoomNumber(PlatformConnector $platform, string $areaName, ?int $platformAreaId): string {
+        $areaName = trim($areaName);
+        if ($areaName !== '') {
+            return $areaName;
+        }
+        if (!is_int($platformAreaId) || $platformAreaId <= 0) {
+            return '';
+        }
+        $rec = $this->fetchPlatformEntity(
+            $platform,
+            '/v2/Areas/' . $platformAreaId . '?columns=LocationCode,RoomNumber,locationCode,roomNumber'
+        );
+        if (!is_array($rec)) {
+            return '';
+        }
+        $loc = $this->scalarStringFromRecord($rec, ['LocationCode', 'locationCode'])
+            ?? $this->stringFieldFromRecord($rec, ['LocationCode', 'locationCode']);
+        if ($loc !== NULL && $loc !== '') {
+            return $loc;
+        }
+        $room = $this->scalarStringFromRecord($rec, ['RoomNumber', 'roomNumber'])
+            ?? $this->stringFieldFromRecord($rec, ['RoomNumber', 'roomNumber']);
+        return $room !== NULL && $room !== '' ? $room : '';
+    }
+
+    /**
+     * Human-readable floor / area context for WorkRequest.subLocation (TMA "Type Description" style).
+     */
+    private function resolveWorkRequestSubLocation(PlatformConnector $platform, ?int $platformAreaId): string {
+        if (!is_int($platformAreaId) || $platformAreaId <= 0) {
+            return '';
+        }
+        $areaPaths = [
+            '/v2/Areas/' . $platformAreaId . '?columns=FloorId,Description,description',
+            '/v2/Areas/' . $platformAreaId,
+        ];
+        $fallbackDescription = '';
+        foreach ($areaPaths as $apath) {
+            $area = $this->fetchPlatformEntity($platform, $apath);
+            if (!is_array($area)) {
+                continue;
+            }
+            $ad = $this->scalarStringFromRecord($area, ['Description', 'description'])
+                ?? $this->stringFieldFromRecord($area, ['Description', 'description']);
+            if ($ad !== NULL && $ad !== '') {
+                $fallbackDescription = $ad;
+            }
+            $fid = $area['FloorId'] ?? $area['floorId'] ?? NULL;
+            if (!is_numeric($fid) || (int) $fid <= 0) {
+                continue;
+            }
+            $fl = $this->fetchPlatformEntity($platform, '/v2/Floors/' . (int) $fid . '?columns=Description,Name,description,name');
+            if (!is_array($fl)) {
+                continue;
+            }
+            $d = $this->scalarStringFromRecord($fl, ['Description', 'description'])
+                ?? $this->stringFieldFromRecord($fl, ['Description', 'description']);
+            if ($d !== NULL && $d !== '') {
+                return $this->normalizeDoublePrefixedLocationCode($d);
+            }
+            $n = $this->scalarStringFromRecord($fl, ['Name', 'name'])
+                ?? $this->stringFieldFromRecord($fl, ['Name', 'name']);
+            if ($n !== NULL && $n !== '') {
+                return $this->normalizeDoublePrefixedLocationCode($n);
+            }
+        }
+
+        return $fallbackDescription !== '' ? $this->normalizeDoublePrefixedLocationCode($fallbackDescription) : '';
+    }
+
+    /**
      * Resolve a taxonomy term's TMA id by term name.
      */
     private function lookupTermTmaIdByName(string $vocab, string $fieldMachineName, string $termName): ?int {
@@ -628,93 +1000,6 @@ class TmaFrontController {
         catch (\Throwable) {
             return NULL;
         }
-    }
-
-    /**
-     * Lookup Task by Code using Platform API.
-     *
-     * @return array<string, mixed>|null
-     */
-    private function lookupTaskByCode(PlatformConnector $platform, string $taskCode): ?array {
-        // Platform list endpoints may return either a bare list or {Data: [...], TotalCount: N}.
-        $filter = rawurlencode("Code eq '" . str_replace("'", "''", $taskCode) . "'");
-        // RepairCenterLinks is not a valid list column in some TMA instances; PreferredRepairCenterId is.
-        $resp = $platform->get('/v2/Tasks?filter=' . $filter . '&pageSize=1&columns=Id,Code,PreferredRepairCenterId');
-        $rows = $this->decodePlatformListRows($resp);
-        if (isset($rows[0]) && is_array($rows[0])) {
-            return $rows[0];
-        }
-
-        // Case-insensitive fallback.
-        $filter2 = rawurlencode("tolower(Code) eq '" . str_replace("'", "''", strtolower($taskCode)) . "'");
-        $resp2 = $platform->get('/v2/Tasks?filter=' . $filter2 . '&pageSize=1&columns=Id,Code,PreferredRepairCenterId');
-        $rows2 = $this->decodePlatformListRows($resp2);
-        if (isset($rows2[0]) && is_array($rows2[0])) {
-            return $rows2[0];
-        }
-        return NULL;
-    }
-
-    private function extractTaskRepairCenterId(array $task): ?int {
-        $pref = $task['PreferredRepairCenterId'] ?? $task['preferredRepairCenterId'] ?? NULL;
-        if (is_numeric($pref)) {
-            return (int) $pref;
-        }
-        $links = $task['repairCenterLinks'] ?? $task['RepairCenterLinks'] ?? NULL;
-        if (!is_array($links) || $links === []) {
-            return NULL;
-        }
-        // Prefer preferred link when present, else first.
-        $preferred = NULL;
-        foreach ($links as $link) {
-            if (is_array($link) && (($link['preferred'] ?? FALSE) === TRUE || ($link['Preferred'] ?? FALSE) === TRUE)) {
-                $preferred = $link;
-                break;
-            }
-        }
-        $link = $preferred ?? (is_array($links[0] ?? NULL) ? $links[0] : NULL);
-        if (!is_array($link)) {
-            return NULL;
-        }
-        $id = $link['repairCenterId'] ?? $link['RepairCenterId'] ?? NULL;
-        return is_numeric($id) ? (int) $id : NULL;
-    }
-
-    private function lookupAreaRepairCenterId(PlatformConnector $platform, int $areaId): ?int {
-        $resp = $platform->get('/v2/Areas/' . $areaId . '?columns=Id,RepairCenterLinks,RepairCenterId');
-        if (!method_exists($resp, 'getBody')) {
-            return NULL;
-        }
-        $data = json_decode((string) $resp->getBody(), TRUE);
-        if (!is_array($data)) {
-            return NULL;
-        }
-        $rc = $data['RepairCenterId'] ?? $data['repairCenterId'] ?? NULL;
-        if (is_numeric($rc)) {
-            return (int) $rc;
-        }
-        $links = $data['RepairCenterLinks'] ?? $data['repairCenterLinks'] ?? NULL;
-        if (!is_array($links) || $links === []) {
-            return NULL;
-        }
-        $first = is_array($links[0] ?? NULL) ? $links[0] : NULL;
-        if (!is_array($first)) {
-            return NULL;
-        }
-        $id = $first['RepairCenterId'] ?? $first['repairCenterId'] ?? NULL;
-        return is_numeric($id) ? (int) $id : NULL;
-    }
-
-    private function lookupRepairCenterIdByCode(PlatformConnector $platform, string $code): ?int {
-        $filter = rawurlencode("Code eq '" . str_replace("'", "''", $code) . "'");
-        $resp = $platform->get('/v2/RepairCenters?filter=' . $filter . '&pageSize=1&columns=Id,Code');
-        $rows = $this->decodePlatformListRows($resp);
-        $first = is_array($rows[0] ?? NULL) ? $rows[0] : NULL;
-        if (!is_array($first)) {
-            return NULL;
-        }
-        $id = $first['Id'] ?? $first['id'] ?? NULL;
-        return is_numeric($id) ? (int) $id : NULL;
     }
 
     /**

@@ -49,12 +49,11 @@ class TmaFormHandler extends WebformHandlerBase {
 
       if (count($results)) {
         $webform_submission->setElementData('task_select', $results[0]->field_task_code_value);
-        if ($results[0]->field_repair_center_value) {
-          $webform_submission->setElementData('repair_center', 'FS');
-        }
-        else {
-          $webform_submission->setElementData('repair_center', '');
-        }
+        // field_repair_center on the task node comes from fixit_tasks.yml repair_center (via seeder).
+        $webform_submission->setElementData(
+          'repair_center',
+          $results[0]->field_repair_center_value ? 'FS' : ''
+        );
       }
       else {
         $webform_submission->setElementData('task_select', '');
@@ -73,8 +72,8 @@ class TmaFormHandler extends WebformHandlerBase {
 
       $response = $tmaFrontController->submitFixitRequest($webform_submission->getData());
       $ticketresponse = json_decode((string) $response->getBody(), TRUE);
-      // `ucb_tma_interface` returns a legacy-shaped response body so downstream webform
-      // parsing can consistently read `NewDataSet...ILOG_NUMBER`.
+      // `ucb_tma_interface` returns a legacy-shaped body; ILOG_NUMBER is the TMA request # for
+      // confirmation (work order number is only used if the API omits the request number).
       $ticket_id = $ticketresponse['NewDataSet']['i_WebTMA_Requests'][0]['ILOG_NUMBER']
         ?? '';
       $webform_submission->setElementData('ticket_id', (string) $ticket_id);
