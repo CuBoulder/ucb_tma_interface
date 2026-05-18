@@ -16,7 +16,7 @@
   task_code: DNGGEN
   exception: false
   exception_text: null
-  repair_center: false
+  repair_center: true
 - title: Trash/Recycling
   parent_tile: Grounds
   task_code: null
@@ -153,7 +153,7 @@
   task_code: DNGEQP
   exception: false
   exception_text: null
-  repair_center: false
+  repair_center: true
 - title: Bed Repair
   parent_tile: Furniture
   task_code: BEDRPR
