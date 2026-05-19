@@ -49,36 +49,19 @@ class TmaFormHandler extends WebformHandlerBase {
 
       if (count($results)) {
         $webform_submission->setElementData('task_select', $results[0]->field_task_code_value);
-        if ($results[0]->field_repair_center_value) {
-          $webform_submission->setElementData('repair_center', 'FS');
-        }
-        else {
-          $webform_submission->setElementData('repair_center', '');
-        }
+        // field_repair_center on the task node comes from fixit_tasks.yml repair_center (via seeder).
+        $webform_submission->setElementData(
+          'repair_center',
+          $results[0]->field_repair_center_value ? 'FS' : ''
+        );
       }
       else {
         $webform_submission->setElementData('task_select', '');
         $webform_submission->setElementData('repair_center', '');
       }
 
-      // Add floor code to submission results.
-      $area = $webform_submission->getElementData('area');
-      $area_query = \Drupal::database()->select('taxonomy_term_field_data', 'd');
-      $area_query->leftJoin('taxonomy_term__field_floor', 'f', 'd.tid = f.entity_id');
-      $area_query->addField('f', 'field_floor_value');
-      $area_query->condition('d.name', $area);
-      $area_results = $area_query->execute()->fetchAll(\PDO::FETCH_OBJ);
-      if (count($area_results)) {
-        if ($area_results[0]->field_floor_value) {
-          $webform_submission->setElementData('floor', $area_results[0]->field_floor_value);
-        }
-        else {
-          $webform_submission->setElementData('floor', '');
-        }
-      }
-      else {
-        $webform_submission->setElementData('floor', '');
-      }
+      $area = (string) $webform_submission->getElementData('area');
+      $webform_submission->setElementData('floor', $tmaFrontController->getFloorFromAreaTaxonomy($area, NULL));
       $building = $webform_submission->getElementData('building');
       if ($building == 'Faculty Staff Court') {
         $webform_submission->setElementData('building', 'Faculty/Staff Court');
@@ -89,8 +72,8 @@ class TmaFormHandler extends WebformHandlerBase {
 
       $response = $tmaFrontController->submitFixitRequest($webform_submission->getData());
       $ticketresponse = json_decode((string) $response->getBody(), TRUE);
-      // `ucb_tma_interface` returns a legacy-shaped response body so downstream webform
-      // parsing can consistently read `NewDataSet...ILOG_NUMBER`.
+      // `ucb_tma_interface` returns a legacy-shaped body; ILOG_NUMBER is the TMA request # for
+      // confirmation (work order number is only used if the API omits the request number).
       $ticket_id = $ticketresponse['NewDataSet']['i_WebTMA_Requests'][0]['ILOG_NUMBER']
         ?? '';
       $webform_submission->setElementData('ticket_id', (string) $ticket_id);
