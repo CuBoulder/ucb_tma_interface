@@ -40,25 +40,28 @@ class TmaFormHandler extends WebformHandlerBase {
     if ($this->shouldRunTmaSubmission($form, $form_state, $webform_submission)) {
       $tmaFrontController = new TmaFrontController();
       $task = $webform_submission->getElementData('task_select');
-      $query = \Drupal::database()->select('node__field_task_code', 't');
-      $query->addField('t', 'field_task_code_value');
-      $query->leftJoin('node__field_repair_center', 'r', 't.entity_id = r.entity_id');
-      $query->addField('r', 'field_repair_center_value');
-      $query->condition('t.entity_id', $task);
-      $results = $query->execute()->fetchAll(\PDO::FETCH_OBJ);
-
-      if (count($results)) {
-        $webform_submission->setElementData('task_select', $results[0]->field_task_code_value);
-        // field_repair_center on the task node comes from fixit_tasks.yml repair_center (via seeder).
-        $webform_submission->setElementData(
-          'repair_center',
-          $results[0]->field_repair_center_value ? 'FS' : ''
-        );
+      $taskCode = '';
+      $repairCenterFromTask = FALSE;
+      if ($task !== NULL && $task !== '') {
+        $query = \Drupal::database()->select('node__field_task_code', 't');
+        $query->addField('t', 'field_task_code_value');
+        $query->leftJoin('node__field_repair_center', 'r', 't.entity_id = r.entity_id');
+        $query->addField('r', 'field_repair_center_value');
+        $query->condition('t.entity_id', $task);
+        $results = $query->execute()->fetchAll(\PDO::FETCH_OBJ);
+        if (count($results) && trim((string) ($results[0]->field_task_code_value ?? '')) !== '') {
+          $taskCode = trim((string) $results[0]->field_task_code_value);
+          $repairCenterFromTask = (bool) ($results[0]->field_repair_center_value ?? FALSE);
+        }
       }
-      else {
-        $webform_submission->setElementData('task_select', '');
-        $webform_submission->setElementData('repair_center', '');
+      if ($taskCode === '') {
+        $taskCode = $tmaFrontController->resolveFixitTaskCode(['task_select' => (string) $task]);
+        if ($taskCode !== '' && $repairCenterFromTask === FALSE) {
+          $repairCenterFromTask = $tmaFrontController->taskRepairCenterEnabledFromTaskCode($taskCode);
+        }
       }
+      $webform_submission->setElementData('task_select', $taskCode);
+      $webform_submission->setElementData('repair_center', $repairCenterFromTask ? 'FS' : '');
 
       $area = (string) $webform_submission->getElementData('area');
       $webform_submission->setElementData('floor', $tmaFrontController->getFloorFromAreaTaxonomy($area, NULL));

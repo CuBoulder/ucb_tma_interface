@@ -24,3 +24,9 @@ ucb_tma_interface.settings:
     platform_request_type_code:
       type: string
       label: "Platform API WorkRequest request type code (e.g. WEB for Fix It)"
+    platform_facility_location_type_id:
+      type: integer
+      label: "Platform API LocationTypeId for Facility on RequestLog (often 10)"
+    platform_area_location_type_id:
+      type: integer
+      label: "Platform API LocationTypeId for Area on RequestLog (often 7)"
