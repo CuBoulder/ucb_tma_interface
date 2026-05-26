@@ -435,7 +435,7 @@
   task_code: PROJ-REQ
   exception: false
   exception_text: null
-  repair_center: true
+  repair_center: false
   parent_vid: "services"
 - title: Request Signage
   parent_tile: Install - Hang - Build
