@@ -941,9 +941,16 @@ class TmaFrontController {
      * @return array{code: string, name: string|null}
      */
     private function resolveRepairCenterForWorkRequest(PlatformConnector $platform, array $request, string $taskCode): array {
-        $code = trim((string) ($request['repair_center'] ?? ''));
-        if ($code === '' && $taskCode !== '' && $this->taskRepairCenterEnabledFromTaskCode($taskCode)) {
-            $code = 'FS';
+        // Webform handler sets repair_center to '' or 'FS' from the selected task node; do not
+        // override an explicit empty value by looking up task code (SIGNAG matches multiple tasks).
+        if (array_key_exists('repair_center', $request)) {
+            $code = trim((string) $request['repair_center']);
+        }
+        else {
+            $code = '';
+            if ($code === '' && $taskCode !== '' && $this->taskRepairCenterEnabledFromTaskCode($taskCode)) {
+                $code = 'FS';
+            }
         }
         if ($code === '') {
             return [];
@@ -967,12 +974,38 @@ class TmaFrontController {
                 ->accessCheck(FALSE)
                 ->condition('type', 'task')
                 ->condition('field_task_code', $taskCode)
-                ->range(0, 1)
                 ->execute();
             if (!$nids) {
                 return FALSE;
             }
-            $node = \Drupal::entityTypeManager()->getStorage('node')->load((int) reset($nids));
+            // Multiple tasks can share a code (e.g. SIGNAG); do not send FS if any match is false.
+            $anyTrue = FALSE;
+            foreach ($nids as $nid) {
+                $node = \Drupal::entityTypeManager()->getStorage('node')->load((int) $nid);
+                if (!$node || !$node->hasField('field_repair_center') || $node->get('field_repair_center')->isEmpty()) {
+                    continue;
+                }
+                if (!(bool) $node->get('field_repair_center')->value) {
+                    return FALSE;
+                }
+                $anyTrue = TRUE;
+            }
+            return $anyTrue;
+        }
+        catch (\Throwable) {
+            return FALSE;
+        }
+    }
+
+    /**
+     * Repair center flag for a specific task node (webform task_select nid).
+     */
+    public function taskRepairCenterEnabledFromNodeId(int $nodeId): bool {
+        if ($nodeId <= 0) {
+            return FALSE;
+        }
+        try {
+            $node = \Drupal::entityTypeManager()->getStorage('node')->load($nodeId);
             if (!$node || !$node->hasField('field_repair_center') || $node->get('field_repair_center')->isEmpty()) {
                 return FALSE;
             }
