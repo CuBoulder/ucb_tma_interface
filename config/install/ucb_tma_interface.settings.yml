@@ -10,3 +10,7 @@ debug_api_logging: false
 
 # Platform WorkRequest: RequestTypes.Code for Fix It (see /v2/RequestTypes).
 platform_request_type_code: "WEB"
+
+# RequestLog LocationTypeId: Facility = 10, Area = 7
+platform_facility_location_type_id: 10
+platform_area_location_type_id: 7

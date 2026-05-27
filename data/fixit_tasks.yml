@@ -435,14 +435,14 @@
   task_code: PROJ-REQ
   exception: false
   exception_text: null
-  repair_center: true
+  repair_center: false
   parent_vid: "services"
 - title: Request Signage
   parent_tile: Install - Hang - Build
   task_code: SIGNAG
   exception: false
   exception_text: null
-  repair_center: true
+  repair_center: false
   parent_vid: "services"
 - title: Move or Remove an Existing Loft
   parent_tile: Furniture

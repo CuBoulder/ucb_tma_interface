@@ -67,6 +67,22 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
             "#default_value" => (bool) $config->get("debug_api_logging"),
         ];
 
+        $form["platform_facility_location_type_id"] = [
+            "#type" => "number",
+            "#title" => $this->t("Facility LocationTypeId"),
+            "#description" => $this->t("RequestLog locationTypeId when Location is a Facility (typically 10)."),
+            "#default_value" => (int) ($config->get("platform_facility_location_type_id") ?? 10),
+            "#min" => 1,
+        ];
+
+        $form["platform_area_location_type_id"] = [
+            "#type" => "number",
+            "#title" => $this->t("Area LocationTypeId"),
+            "#description" => $this->t("RequestLog locationTypeId when Location is an Area (typically 7)."),
+            "#default_value" => (int) ($config->get("platform_area_location_type_id") ?? 7),
+            "#min" => 1,
+        ];
+
         return parent::buildForm($form, $form_state);
     }
 
@@ -82,6 +98,8 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
             ->set("authentication_client_name", $form_state->getValue("authentication_client_name") ? $form_state->getValue("authentication_client_name") : $config->get("authentication_client_name"))
             ->set("authentication_pass", $form_state->getValue("authentication_pass") ? $form_state->getValue("authentication_pass") : $config->get("authentication_pass"))
             ->set("debug_api_logging", (bool) $form_state->getValue("debug_api_logging"))
+            ->set("platform_facility_location_type_id", (int) $form_state->getValue("platform_facility_location_type_id"))
+            ->set("platform_area_location_type_id", (int) $form_state->getValue("platform_area_location_type_id"))
             ->save();
 
         parent::submitForm($form, $form_state);
