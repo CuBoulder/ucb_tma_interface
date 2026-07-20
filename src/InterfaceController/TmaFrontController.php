@@ -397,10 +397,10 @@ class TmaFrontController {
     }
 
     /**
-     * RequestLog.RequestDate at UTC midnight (e.g. 2026-05-22T00:00:00Z).
+     * RequestLog.RequestDate as the actual submission time in UTC
      */
     private function formatRequestLogDateUtc(): string {
-        return gmdate('Y-m-d') . 'T00:00:00Z';
+        return gmdate('c');
     }
 
     /**
