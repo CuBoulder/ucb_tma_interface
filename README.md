@@ -36,9 +36,6 @@ Location taxonomy is pulled live from TMA API. Tasks are hard-coded and come fro
 ```bash
 # Import facilities, buildings, areas, and tasks
 drush tma:seed-fixit
-
-# Same command, shorter alias
-drush tma-seed-fixit
 ```
 
 Optional flags:
