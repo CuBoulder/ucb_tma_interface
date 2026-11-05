@@ -131,6 +131,10 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
 				}
 			}
 			$element['#validated'] = TRUE;
+        } else if ($element['#webform_id'] === 'umc_maintenance_request--room') {
+			// Options are filled in the browser from /tma/location/area
+			// submitted value is the platform area id
+			$element['#validated'] = TRUE;
 //        } elseif ($element['#webform_id'] === 'report_a_problem--facility') {
 //			ksm($element);
         }
@@ -138,8 +142,7 @@ function ucb_tma_interface_webform_element_alter(array &$element, \Drupal\Core\F
 }
 
 function ucb_tma_interface_webform_submission_form_alter(array &$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
-	// Ensure the FixIt UI behavior JS is attached even if a webform handler is misconfigured.
-	// This is needed for exception popups and location dropdown UX.
+	// Ensure the FixIt UI behavior JS is attached - needed for exception popups and location dropdown UX
 	try {
 		$webform_id = $form['#webform_id'] ?? NULL;
 		if ($webform_id === 'report_a_problem' || $webform_id === 'request_services') {
@@ -147,6 +150,9 @@ function ucb_tma_interface_webform_submission_form_alter(array &$form, \Drupal\C
 		}
 		if ($webform_id === 'fix_it_survey') {
 			$form['#attached']['library'][] = 'ucb_tma_interface/ucb-fixit-survey';
+		}
+		if ($webform_id === 'umc_maintenance_request') {
+			$form['#attached']['library'][] = 'ucb_tma_interface/umc';
 		}
 	}
 	catch (\Throwable) {
