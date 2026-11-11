@@ -51,7 +51,7 @@ class UmcRequestController {
       'RequestorPhone' => trim((string) ($data['phone'] ?? '')),
       'RequestorEmail' => $email,
       'FacilityId' => '15873',
-      'IsPending' => TRUE,
+      'isPending' => TRUE,
       'BuildingId' => '3740194',
       'RequestTypeId' => '3194096',
       'AreaId' => $areaId,
