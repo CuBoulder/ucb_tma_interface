@@ -4,9 +4,11 @@ Connects CU Boulder's Fix It webforms to [TMA Systems webTMA](https://webtma.com
 
 ## What it does
 
-- Creates two Forms: **Report a problem** (`report_a_problem`) and **Request services** (`request_services`) wizard webforms collect the issue, location, and contact info.
+- Creates two wizard forms: **Report a problem** (`report_a_problem`) and **Request services** (`request_services`). They collect the issue, location, and contact info.
 - On final submit, the **UCB TMA form handler** posts a RequestLog to Platform API `POST /v2/Requests`.
-- The TMA request number is stored on the webform as `ticket_id` for the confirmation page, you can use the TMA portal (`https://tma.colorado.edu/WebTMA7/SAML/ACS?c=ucb`) to check this number under Requests.
+- The TMA request number is stored on the webform as `ticket_id` for the confirmation page. You can check this number under Requests in the TMA portal (`https://tma.colorado.edu/WebTMA7/SAML/ACS?c=ucb`).
+- **UMC Maintenance Request** (`umc_maintenance_request`) is a single-page form locked to the University Memorial Center (UMC). The room list comes from `/tma/location/area`, limited to building `3740194`. It does not use the task picker or the TMA form handler.
+- The UMC page script posts to `/tma/umc-request`. That route uses the same Platform login and `POST /v2/Requests`, with repair center `1000`, so Platform opens a work order immediately on this form (expected behavior from Student Affairs/UMC staff). The confirmation shows the request number from that response.
 - Cascading **facility → building → area** dropdowns are filled from TMA (and from seeded Drupal taxonomy).
 - Some tasks show an **exception modal** instead of submitting (for example, issues that should be handled another way). These lock the form and show a modal with follow up instructions, to prevent submissions.
 - A post-form completion **Fix It Survey** (`fix_it_survey`) collects emoji feedback after confirmation.
@@ -68,7 +70,7 @@ Endpoints used here:
 | --- | --- |
 | `POST /v2/Users/Authenticate` | JWT login - need to provided Bearer token with below requests |
 | `GET /v2/Facilities`, `/v2/Buildings`, `/v2/Areas` | Location seed + dropdown JSON |
-| `POST /v2/Requests` | Create a Fix It request log |
+| `POST /v2/Requests` | Create a Fix It or UMC request log |
 | `PATCH /v2/Requests/{id}` | Set task code after create (POST often leaves it empty) |
 | `GET /v2/Requests`, `/v2/Tasks`, `/v2/RequestTypes`, `/v2/RepairCenters`, `/v2/Floors` | Lookup ids, codes, and verification |
 
@@ -78,6 +80,7 @@ Drupal also exposes local JSON routes used by the forms:
 - `/tma/location/building`
 - `/tma/location/area` and `/tma/location/area/{facility}`
 - `/tma/task-exceptions`
+- `POST /tma/umc-request` (UMC form only; requires the session CSRF header)
 
 ## Content and forms
 
@@ -85,7 +88,7 @@ The module installs:
 
 - Vocabularies: **facility**, **building**, **area**, **categories**, **services**
 - Content type: **Task** (options on the two Fix It forms)
-- Webforms: Report a problem, Request services, Fix It Survey
+- Webforms: Report a problem, Request services, UMC Maintenance Request, Fix It Survey
 - View: `task_selection` (filters tasks by selected category/service)
 
 ## Fix It Survey block
