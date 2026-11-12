@@ -38,7 +38,7 @@ class TmaInterfaceSettingsForm extends ConfigFormBase {
         $form["base_url"] = [
             "#type" => "textfield",
             "#title" => $this->t("Platform API Base Url"),
-            "#description" => $this->t("Example: https://devtma7.colorado.edu/webTMA7/platformapi (no trailing slash)"),
+            "#description" => $this->t("Example: https://tma.colorado.edu/webTMA7/platformapi (no trailing slash)"),
             "#default_value" => $config->get("base_url")
         ];
 
