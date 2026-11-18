@@ -2,7 +2,7 @@
 authentication_user: "FIXIT"
 authentication_pass: ""
 authentication_client_name: "ucb"
-base_url: "https://devtma7.colorado.edu/webTMA7/platformapi"
+base_url: "https://tma.colorado.edu/webTMA7/platformapi"
 
 # When enabled, logs request/response payloads for debugging.
 # WARNING: may include requestor PII (name/email/phone) and request text.

@@ -34,6 +34,15 @@ ucb_tma_interface.settings:
   requirements:
     _permission: administer site configuration
 
+ucb_tma_interface.umc_request:
+  path: /tma/umc-request
+  defaults:
+    _controller: Drupal\ucb_tma_interface\InterfaceController\UmcRequestController::submit
+  methods: [POST]
+  requirements:
+    _permission: access content
+    _csrf_request_header_token: 'TRUE'
+
 ucb_tma_interface.task_exceptions:
   path: /tma/task-exceptions
   defaults:

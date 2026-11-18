@@ -1,0 +1,34 @@
+<?php
+
+/**
+ * @file
+ * Install and update hooks
+ */
+
+use Drupal\Core\Config\FileStorage;
+
+/**
+ * Adds/updates the UMC Maintenance Request form
+ */
+function ucb_tma_interface_update_8001() {
+  $config_name = 'webform.webform.umc_maintenance_request';
+  $module_path = \Drupal::service('extension.list.module')->getPath('ucb_tma_interface');
+  $source = new FileStorage($module_path . '/config/install');
+  $data = $source->read($config_name);
+  if (!is_array($data)) {
+    throw new \RuntimeException(sprintf('Missing install config %s.', $config_name));
+  }
+
+  $storage = \Drupal::entityTypeManager()->getStorage('webform');
+  $webform = $storage->load('umc_maintenance_request');
+  if ($webform) {
+    foreach ($data as $key => $value) {
+      $webform->set($key, $value);
+    }
+    $webform->save();
+    return 'Updated the UMC Maintenance Request webform.';
+  }
+
+  $storage->create($data)->save();
+  return 'Added the UMC Maintenance Request webform.';
+}
